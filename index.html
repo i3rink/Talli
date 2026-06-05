@@ -1,0 +1,1116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#0d9488">
+<title>Annick — Stock Check</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600&family=Hanken+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs" type="module" id="pdfjs-script"></script>
+<style>
+  :root {
+    --teal: #0d9488;
+    --teal-light: #ccfbf1;
+    --teal-dark: #0f766e;
+    --teal-pale: #f0fdfa;
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --border: #e2e8f0;
+    --border-strong: #cbd5e1;
+    --text: #0f172a;
+    --text-muted: #64748b;
+    --text-light: #94a3b8;
+    --red: #ef4444;
+    --red-light: #fee2e2;
+    --red-dark: #dc2626;
+    --green: #10b981;
+    --green-light: #d1fae5;
+    --amber: #f59e0b;
+    --amber-light: #fef3c7;
+    --dot-color: #cbd5e1;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 1px 3px rgba(0,0,0,0.08), 0 1px 2px rgba(0,0,0,0.04);
+    --shadow-md: 0 4px 6px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Hanken Grotesk', system-ui, sans-serif;
+    background: var(--bg);
+    background-image: radial-gradient(var(--dot-color) 1px, transparent 1px);
+    background-size: 20px 20px;
+    color: var(--text);
+    min-height: 100vh;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 1rem;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 56px;
+  }
+
+  .logo {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .logo-dot {
+    width: 8px; height: 8px;
+    background: var(--teal);
+    border-radius: 50%;
+    display: inline-block;
+  }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* ── MAIN ── */
+  main { max-width: 800px; margin: 0 auto; padding: 1.5rem 1rem 4rem; }
+
+  /* ── UPLOAD ZONE ── */
+  #upload-section { margin-bottom: 1.5rem; }
+
+  .upload-zone {
+    background: var(--surface);
+    border: 2px dashed var(--border-strong);
+    border-radius: var(--radius);
+    padding: 2.5rem 1.5rem;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    position: relative;
+  }
+
+  .upload-zone:hover, .upload-zone.drag-over {
+    border-color: var(--teal);
+    background: var(--teal-pale);
+  }
+
+  .upload-zone input[type="file"] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+
+  .upload-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    color: var(--text-light);
+    display: block;
+  }
+
+  .upload-title {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.25rem;
+  }
+
+  .upload-sub {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  /* ── FILE PILLS ── */
+  #file-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 1rem;
+  }
+
+  .file-pill {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 4px 12px 4px 10px;
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .file-pill.parsed { border-color: var(--teal); color: var(--teal-dark); }
+  .file-pill.error { border-color: var(--red); color: var(--red-dark); }
+
+  .file-pill-dot {
+    width: 6px; height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
+  }
+
+  /* ── PARSE BUTTON ── */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border-radius: var(--radius-sm);
+    font-family: 'Hanken Grotesk', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    border: none;
+    transition: opacity 0.1s, transform 0.1s;
+  }
+
+  .btn:active { transform: scale(0.97); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-primary {
+    background: var(--teal);
+    color: white;
+  }
+
+  .btn-primary:hover:not(:disabled) { background: var(--teal-dark); }
+
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+  }
+
+  .btn-ghost:hover:not(:disabled) { background: var(--bg); }
+
+  .btn-danger {
+    background: var(--red-light);
+    color: var(--red-dark);
+    border: 1px solid #fca5a5;
+  }
+
+  /* ── PARSE CONTROLS ── */
+  #parse-controls {
+    display: flex;
+    gap: 8px;
+    margin-top: 1rem;
+    flex-wrap: wrap;
+  }
+
+  /* ── PROGRESS ── */
+  #progress-bar-wrap {
+    height: 4px;
+    background: var(--border);
+    border-radius: 99px;
+    overflow: hidden;
+    margin-top: 1rem;
+    display: none;
+  }
+
+  #progress-bar {
+    height: 100%;
+    background: var(--teal);
+    border-radius: 99px;
+    transition: width 0.2s;
+    width: 0%;
+  }
+
+  /* ── SUMMARY CARDS ── */
+  #summary-section { display: none; margin-bottom: 1.5rem; }
+
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 1rem;
+  }
+
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1rem;
+    box-shadow: var(--shadow);
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 0.35rem;
+  }
+
+  .stat-value {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+  }
+
+  .stat-value.green { color: var(--green); }
+  .stat-value.red { color: var(--red-dark); }
+  .stat-value.amber { color: var(--amber); }
+
+  /* ── VIEWS ── */
+  .view-tabs {
+    display: flex;
+    gap: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 4px;
+    margin-bottom: 1rem;
+    width: fit-content;
+  }
+
+  .view-tab {
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.12s;
+  }
+
+  .view-tab.active {
+    background: var(--teal);
+    color: white;
+  }
+
+  /* ── STOCK LIST ── */
+  #stock-section { display: none; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .section-title {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+  }
+
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    max-width: 260px;
+    min-width: 160px;
+  }
+
+  .search-wrap input {
+    width: 100%;
+    padding: 7px 10px 7px 32px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    font-family: inherit;
+    background: var(--surface);
+    color: var(--text);
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 9px; top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-light);
+    font-size: 14px;
+    pointer-events: none;
+  }
+
+  /* ── ITEM ROW ── */
+  .item-list { display: flex; flex-direction: column; gap: 6px; }
+
+  .item-row {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    align-items: center;
+    gap: 10px;
+    box-shadow: var(--shadow);
+    transition: border-color 0.12s;
+  }
+
+  .item-row.in-stock { border-left: 3px solid var(--green); }
+  .item-row.short { border-left: 3px solid var(--red); }
+  .item-row.unchecked { border-left: 3px solid var(--border-strong); }
+
+  .item-info { min-width: 0; }
+
+  .item-name {
+    font-weight: 600;
+    font-size: 14px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .item-meta {
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 2px;
+  }
+
+  .item-sku {
+    font-family: monospace;
+    background: var(--bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+    font-size: 11px;
+  }
+
+  .item-qty {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text);
+    text-align: right;
+    white-space: nowrap;
+  }
+
+  .item-qty-unit {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+    font-family: 'Hanken Grotesk', sans-serif;
+  }
+
+  /* ── CHECK BUTTONS ── */
+  .check-buttons {
+    display: flex;
+    gap: 4px;
+  }
+
+  .check-btn {
+    width: 36px; height: 36px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: var(--bg);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    transition: all 0.1s;
+    color: var(--text-muted);
+  }
+
+  .check-btn:active { transform: scale(0.92); }
+
+  .check-btn.tick.active {
+    background: var(--green-light);
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  .check-btn.cross.active {
+    background: var(--red-light);
+    border-color: var(--red);
+    color: var(--red-dark);
+  }
+
+  /* ── JOBS BREAKDOWN (detail expand) ── */
+  .item-jobs {
+    display: none;
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-muted);
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+    grid-column: 1 / -1;
+  }
+
+  .item-jobs.open { display: block; }
+
+  .job-tag {
+    display: inline-block;
+    background: var(--teal-light);
+    color: var(--teal-dark);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 11px;
+    font-weight: 600;
+    margin: 2px 3px 2px 0;
+  }
+
+  /* ── PURCHASING VIEW ── */
+  #purchasing-section { display: none; }
+
+  .empty-state {
+    text-align: center;
+    padding: 3rem 1rem;
+    color: var(--text-muted);
+  }
+
+  .empty-state-icon { font-size: 2.5rem; margin-bottom: 0.5rem; }
+
+  /* ── EXPORT BAR ── */
+  #export-bar {
+    display: none;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 12px 1rem;
+    display: none;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    z-index: 50;
+    flex-wrap: wrap;
+  }
+
+  .export-status {
+    font-size: 13px;
+    color: var(--text-muted);
+  }
+
+  .export-status strong { color: var(--text); }
+
+  /* ── TOAST ── */
+  #toast {
+    position: fixed;
+    bottom: 70px; left: 50%; transform: translateX(-50%);
+    background: var(--text);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 999px;
+    font-size: 13px;
+    z-index: 200;
+    opacity: 0;
+    transition: opacity 0.2s;
+    pointer-events: none;
+    white-space: nowrap;
+  }
+
+  #toast.show { opacity: 1; }
+
+  /* ── MOBILE ── */
+  @media (max-width: 600px) {
+    main { padding: 1rem 0.75rem 5rem; }
+
+    .item-row {
+      grid-template-columns: 1fr auto;
+      grid-template-rows: auto auto;
+    }
+
+    .check-buttons { grid-row: 1; grid-column: 2; }
+    .item-qty { display: none; }
+
+    .item-name { font-size: 13px; }
+
+    .summary-grid { grid-template-columns: repeat(2, 1fr); }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <span class="logo-dot"></span>
+    Annick — Stock Check
+  </div>
+  <div class="header-right">
+    <button class="btn btn-ghost" id="reset-btn" style="display:none; font-size:13px; padding:7px 12px;">Reset</button>
+  </div>
+</header>
+
+<main>
+
+  <!-- UPLOAD -->
+  <section id="upload-section">
+    <div class="upload-zone" id="drop-zone">
+      <input type="file" accept=".pdf" multiple id="file-input">
+      <span class="upload-icon">📄</span>
+      <div class="upload-title">Drop packing slips here</div>
+      <div class="upload-sub">PDF files from Moon Invoice · up to 20 files</div>
+    </div>
+    <div id="file-list"></div>
+    <div id="progress-bar-wrap"><div id="progress-bar"></div></div>
+    <div id="parse-controls" style="display:none">
+      <button class="btn btn-primary" id="parse-btn">Analyse packing slips</button>
+    </div>
+  </section>
+
+  <!-- SUMMARY -->
+  <section id="summary-section">
+    <div class="summary-grid">
+      <div class="stat-card">
+        <div class="stat-label">Jobs loaded</div>
+        <div class="stat-value" id="stat-jobs">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Unique items</div>
+        <div class="stat-value" id="stat-items">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">In stock</div>
+        <div class="stat-value green" id="stat-in">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Short / to order</div>
+        <div class="stat-value red" id="stat-short">0</div>
+      </div>
+    </div>
+
+    <div class="view-tabs">
+      <button class="view-tab active" data-view="stock">Stock check</button>
+      <button class="view-tab" data-view="purchasing">Purchasing list</button>
+    </div>
+  </section>
+
+  <!-- STOCK CHECK VIEW -->
+  <section id="stock-section">
+    <div class="section-header">
+      <div class="section-title">Stock check</div>
+      <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+        <div class="search-wrap">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="search-input" placeholder="Search items…">
+        </div>
+        <select id="filter-select" style="padding:7px 10px; border:1px solid var(--border); border-radius:var(--radius-sm); font-size:13px; font-family:inherit; background:var(--surface); color:var(--text);">
+          <option value="all">All items</option>
+          <option value="unchecked">Unchecked</option>
+          <option value="short">Short only</option>
+          <option value="in-stock">In stock</option>
+        </select>
+      </div>
+    </div>
+    <div class="item-list" id="item-list"></div>
+  </section>
+
+  <!-- PURCHASING VIEW -->
+  <section id="purchasing-section">
+    <div class="section-header">
+      <div class="section-title">Items to order</div>
+    </div>
+    <div id="purchasing-list"></div>
+  </section>
+
+</main>
+
+<!-- EXPORT BAR -->
+<div id="export-bar">
+  <div class="export-status" id="export-status">Checking…</div>
+  <div style="display:flex; gap:8px; flex-wrap:wrap;">
+    <button class="btn btn-ghost" id="export-csv-btn" style="font-size:13px; padding:8px 14px;">Export CSV</button>
+    <button class="btn btn-primary" id="export-purchasing-btn" style="font-size:13px; padding:8px 14px;">Export purchasing list</button>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script type="module">
+'use strict';
+
+// ── PDF.js setup ──────────────────────────────────────────────────────────
+// Wait for pdf.js to be loaded, it comes in as a module
+let pdfjsLib;
+
+async function loadPdfJs() {
+  pdfjsLib = await import('https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.mjs');
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.mjs';
+}
+
+// ── State ─────────────────────────────────────────────────────────────────
+const state = {
+  files: [],        // File objects
+  jobs: [],         // { id, name, items: [{name, sku, qty, unit}] }
+  masterList: [],   // { name, sku, qty, unit, jobs: [{jobName, qty}], status: 'unchecked'|'in-stock'|'short' }
+};
+
+// ── DOM refs ──────────────────────────────────────────────────────────────
+const dropZone     = document.getElementById('drop-zone');
+const fileInput    = document.getElementById('file-input');
+const fileList     = document.getElementById('file-list');
+const parseControls= document.getElementById('parse-controls');
+const progressWrap = document.getElementById('progress-bar-wrap');
+const progressBar  = document.getElementById('progress-bar');
+const parseBtn     = document.getElementById('parse-btn');
+const resetBtn     = document.getElementById('reset-btn');
+const summarySection = document.getElementById('summary-section');
+const stockSection   = document.getElementById('stock-section');
+const purchasingSection = document.getElementById('purchasing-section');
+const itemListEl   = document.getElementById('item-list');
+const purchasingListEl = document.getElementById('purchasing-list');
+const exportBar    = document.getElementById('export-bar');
+const exportStatus = document.getElementById('export-status');
+const searchInput  = document.getElementById('search-input');
+const filterSelect = document.getElementById('filter-select');
+const statJobs     = document.getElementById('stat-jobs');
+const statItems    = document.getElementById('stat-items');
+const statIn       = document.getElementById('stat-in');
+const statShort    = document.getElementById('stat-short');
+
+// ── File handling ─────────────────────────────────────────────────────────
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  addFiles([...e.dataTransfer.files]);
+});
+fileInput.addEventListener('change', () => addFiles([...fileInput.files]));
+
+function addFiles(newFiles) {
+  const pdfs = newFiles.filter(f => f.name.toLowerCase().endsWith('.pdf'));
+  pdfs.forEach(f => {
+    if (!state.files.find(x => x.name === f.name)) state.files.push(f);
+  });
+  renderFilePills();
+  parseControls.style.display = state.files.length ? 'flex' : 'none';
+  resetBtn.style.display = state.files.length ? '' : 'none';
+}
+
+function renderFilePills() {
+  fileList.innerHTML = state.files.map((f, i) => `
+    <div class="file-pill" id="pill-${i}">
+      <span class="file-pill-dot"></span>
+      ${f.name}
+    </div>
+  `).join('');
+}
+
+// ── PDF parsing ───────────────────────────────────────────────────────────
+parseBtn.addEventListener('click', async () => {
+  if (!pdfjsLib) await loadPdfJs();
+  parseBtn.disabled = true;
+  progressWrap.style.display = 'block';
+  state.jobs = [];
+
+  for (let i = 0; i < state.files.length; i++) {
+    const f = state.files[i];
+    const pill = document.getElementById(`pill-${i}`);
+    try {
+      const text = await extractPdfText(f);
+      const job = parsePackingSlip(text, f.name);
+      state.jobs.push(job);
+      if (pill) { pill.classList.add('parsed'); }
+    } catch(err) {
+      console.error('Parse error', f.name, err);
+      if (pill) { pill.classList.add('error'); }
+    }
+    setProgress(((i + 1) / state.files.length) * 100);
+  }
+
+  buildMasterList();
+  renderAll();
+  showToast(`${state.jobs.length} job${state.jobs.length !== 1 ? 's' : ''} analysed`);
+});
+
+async function extractPdfText(file) {
+  const arrayBuffer = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  let fullText = '';
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const content = await page.getTextContent();
+    // Preserve vertical position to reconstruct layout
+    const items = content.items;
+    // Sort by y descending (top to bottom), then x ascending (left to right)
+    const sorted = items.slice().sort((a, b) => {
+      const dy = b.transform[5] - a.transform[5];
+      if (Math.abs(dy) > 3) return dy;
+      return a.transform[4] - b.transform[4];
+    });
+    // Group into lines by y-position
+    const lines = [];
+    let currentLine = [];
+    let lastY = null;
+    for (const item of sorted) {
+      const y = Math.round(item.transform[5]);
+      if (lastY === null || Math.abs(y - lastY) > 3) {
+        if (currentLine.length) lines.push(currentLine.map(i => i.str).join(' ').trim());
+        currentLine = [item];
+        lastY = y;
+      } else {
+        currentLine.push(item);
+      }
+    }
+    if (currentLine.length) lines.push(currentLine.map(i => i.str).join(' ').trim());
+    fullText += lines.join('\n') + '\n';
+  }
+  return fullText;
+}
+
+// ── Parser: Moon Invoice packing slip format ───────────────────────────────
+// Structure: numbered lines "N. Product Name  QTY unit"
+// Next line may be the SKU (code only, no spaces, alphanumeric/dashes)
+// Bundle items have sub-lines (indented descriptions) which we expand
+
+function parsePackingSlip(text, filename) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+
+  // Extract quote number for job ID
+  let jobId = filename.replace('.pdf', '');
+  const quoteMatch = text.match(/Quote\s*#\s*(\S+)/i);
+  if (quoteMatch) jobId = `Q${quoteMatch[1]}`;
+
+  // Extract customer name
+  let customer = '';
+  const quoteToIdx = lines.findIndex(l => /quote\s+to/i.test(l));
+  if (quoteToIdx >= 0 && lines[quoteToIdx + 1]) customer = lines[quoteToIdx + 1];
+
+  const items = [];
+
+  // Regex: line starts with number dot, then product name, then qty+unit at end
+  // e.g. "2. 1700X700mm Rec 30mm Shower Tray White 1 pcs"
+  const itemRegex = /^(\d+)\.\s+(.+?)\s{2,}(\d+(?:\.\d+)?)\s*(pcs|bundle|box|pk|pair|2pk|3pk|4pk|roll|m|lm|set|kit|each|no\.?|nr\.?)?$/i;
+  // Some items have qty right-aligned with minimal space
+  const itemRegex2 = /^(\d+)\.\s+(.+)\s+(\d+(?:\.\d+)?)\s*(pcs|bundle|box|pk|2pk|3pk|4pk|pair|roll|m|lm|set|kit|each)?$/i;
+
+  // SKU pattern: alphanumeric string, may contain dashes, no spaces, 3+ chars
+  const skuRegex = /^[A-Z0-9][A-Z0-9\-_]{2,}$/i;
+
+  // Bundle sub-item pattern: "Nx Description" or "Description"
+  const bundleSubRegex = /^(\d+)x\s+(.+)$/i;
+  const bundleSubRegex2 = /^(\d+)\s*x\s*(.+)$/i;
+
+  // Known bundle SKUs/names
+  const bundleKeywords = /\bkit\b|\bbundle\b/i;
+
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+
+    // Try matching a numbered product line
+    let m = line.match(itemRegex) || line.match(itemRegex2);
+    if (m) {
+      const lineNum = parseInt(m[1]);
+      let name = m[2].trim();
+      let qty = parseFloat(m[3]);
+      let unit = (m[4] || '').toLowerCase() || 'pcs';
+
+      // Normalise unit
+      unit = normaliseUnit(unit, qty);
+
+      // Check next line for SKU
+      let sku = '';
+      let j = i + 1;
+      if (j < lines.length && skuRegex.test(lines[j]) && !/^\d+\.\s/.test(lines[j])) {
+        sku = lines[j].toUpperCase();
+        j++;
+      }
+
+      // Check if this is a bundle item
+      const isBundle = bundleKeywords.test(name) || bundleKeywords.test(unit);
+
+      if (isBundle) {
+        // Collect sub-items until next numbered item
+        const bundleItems = [];
+        while (j < lines.length && !/^\d+\.\s/.test(lines[j])) {
+          const subLine = lines[j].trim();
+          // Try to parse "Nx Description" sub-items
+          const sm = subLine.match(bundleSubRegex) || subLine.match(bundleSubRegex2);
+          if (sm) {
+            const subQty = parseInt(sm[1]) * qty; // multiply by bundle qty
+            const subName = sm[2].trim();
+            if (subName.length > 2) {
+              bundleItems.push({ name: subName, sku: '', qty: subQty, unit: 'pcs', fromBundle: `${name}${sku ? ' (' + sku + ')' : ''}` });
+            }
+          }
+          j++;
+        }
+
+        if (bundleItems.length > 0) {
+          // Add each sub-item as individual line items
+          bundleItems.forEach(bi => items.push(bi));
+        } else {
+          // No parseable sub-items — add the bundle as-is
+          items.push({ name, sku, qty, unit, fromBundle: null });
+        }
+      } else {
+        items.push({ name, sku, qty, unit, fromBundle: null });
+      }
+
+      i = j;
+      continue;
+    }
+
+    i++;
+  }
+
+  return { id: jobId, name: customer || jobId, filename, items };
+}
+
+function normaliseUnit(unit, qty) {
+  if (!unit || unit === 'no' || unit === 'nr') return 'pcs';
+  if (unit === '2pk') return '2-pack';
+  if (unit === '3pk') return '3-pack';
+  if (unit === '4pk') return '4-pack';
+  return unit;
+}
+
+// ── Build master deduplicated list ────────────────────────────────────────
+function buildMasterList() {
+  const map = new Map(); // key: sku || name.toLowerCase()
+
+  state.jobs.forEach(job => {
+    job.items.forEach(item => {
+      const key = item.sku ? item.sku.toUpperCase() : item.name.toLowerCase();
+      if (map.has(key)) {
+        const existing = map.get(key);
+        existing.qty += item.qty;
+        existing.jobs.push({ jobName: job.id, qty: item.qty });
+      } else {
+        map.set(key, {
+          key,
+          name: item.name,
+          sku: item.sku,
+          qty: item.qty,
+          unit: item.unit,
+          fromBundle: item.fromBundle,
+          jobs: [{ jobName: job.id, qty: item.qty }],
+          status: 'unchecked',
+        });
+      }
+    });
+  });
+
+  state.masterList = Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+function renderAll() {
+  document.getElementById('upload-section').style.display = 'none';
+  summarySection.style.display = 'block';
+  stockSection.style.display = 'block';
+  exportBar.style.display = 'flex';
+  resetBtn.style.display = '';
+
+  updateStats();
+  renderStockList();
+  renderPurchasingList();
+}
+
+function updateStats() {
+  const inStock = state.masterList.filter(i => i.status === 'in-stock').length;
+  const short = state.masterList.filter(i => i.status === 'short').length;
+  statJobs.textContent = state.jobs.length;
+  statItems.textContent = state.masterList.length;
+  statIn.textContent = inStock;
+  statShort.textContent = short;
+
+  const checked = inStock + short;
+  const total = state.masterList.length;
+  exportStatus.innerHTML = `<strong>${checked}</strong> of ${total} items checked · <strong>${short}</strong> to order`;
+}
+
+function renderStockList() {
+  const query = searchInput.value.toLowerCase();
+  const filter = filterSelect.value;
+
+  const filtered = state.masterList.filter(item => {
+    const matchSearch = !query ||
+      item.name.toLowerCase().includes(query) ||
+      item.sku.toLowerCase().includes(query);
+    const matchFilter = filter === 'all' ||
+      (filter === 'unchecked' && item.status === 'unchecked') ||
+      (filter === 'short' && item.status === 'short') ||
+      (filter === 'in-stock' && item.status === 'in-stock');
+    return matchSearch && matchFilter;
+  });
+
+  if (!filtered.length) {
+    itemListEl.innerHTML = `<div class="empty-state"><div class="empty-state-icon">🔍</div><div>No items match</div></div>`;
+    return;
+  }
+
+  itemListEl.innerHTML = filtered.map(item => {
+    const statusClass = item.status === 'in-stock' ? 'in-stock' : item.status === 'short' ? 'short' : 'unchecked';
+    const tickActive = item.status === 'in-stock' ? 'active' : '';
+    const crossActive = item.status === 'short' ? 'active' : '';
+    const jobTags = item.jobs.map(j => `<span class="job-tag">${j.jobName} · ${j.qty} ${item.unit}</span>`).join('');
+    const bundleNote = item.fromBundle ? `<span style="color:var(--text-light)">from ${item.fromBundle}</span>` : '';
+    const skuBadge = item.sku ? `<span class="item-sku">${item.sku}</span>` : '';
+
+    return `
+      <div class="item-row ${statusClass}" data-key="${escapeHtml(item.key)}">
+        <div class="item-info">
+          <div class="item-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</div>
+          <div class="item-meta">
+            ${skuBadge}
+            ${bundleNote}
+            <span style="cursor:pointer; color:var(--teal); font-size:11px;" onclick="toggleJobs('${escapeHtml(item.key)}')">
+              ${item.jobs.length} job${item.jobs.length !== 1 ? 's' : ''} ↓
+            </span>
+          </div>
+          <div class="item-jobs" id="jobs-${escapeHtml(item.key)}">${jobTags}</div>
+        </div>
+        <div class="item-qty">
+          ${item.qty}<span class="item-qty-unit"> ${item.unit}</span>
+        </div>
+        <div class="check-buttons">
+          <button class="check-btn tick ${tickActive}" title="In stock" onclick="setStatus('${escapeHtml(item.key)}', 'in-stock')">✓</button>
+          <button class="check-btn cross ${crossActive}" title="Short / to order" onclick="setStatus('${escapeHtml(item.key)}', 'short')">✗</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderPurchasingList() {
+  const shortItems = state.masterList.filter(i => i.status === 'short');
+  if (!shortItems.length) {
+    purchasingListEl.innerHTML = `<div class="empty-state">
+      <div class="empty-state-icon">✅</div>
+      <div>No items flagged short yet</div>
+      <div style="font-size:13px; margin-top:4px">Mark items as short in the stock check view</div>
+    </div>`;
+    return;
+  }
+
+  purchasingListEl.innerHTML = `<div class="item-list">` + shortItems.map(item => {
+    const jobTags = item.jobs.map(j => `<span class="job-tag">${j.jobName} · ${j.qty} ${item.unit}</span>`).join('');
+    const skuBadge = item.sku ? `<span class="item-sku">${item.sku}</span>` : '';
+    return `
+      <div class="item-row short">
+        <div class="item-info">
+          <div class="item-name">${escapeHtml(item.name)}</div>
+          <div class="item-meta">${skuBadge}</div>
+          <div class="item-jobs open">${jobTags}</div>
+        </div>
+        <div class="item-qty">${item.qty}<span class="item-qty-unit"> ${item.unit}</span></div>
+        <div></div>
+      </div>
+    `;
+  }).join('') + `</div>`;
+}
+
+// ── Interactions ──────────────────────────────────────────────────────────
+window.setStatus = function(key, status) {
+  const item = state.masterList.find(i => i.key === key);
+  if (!item) return;
+  item.status = item.status === status ? 'unchecked' : status; // toggle off
+  updateStats();
+  renderStockList();
+  renderPurchasingList();
+};
+
+window.toggleJobs = function(key) {
+  const el = document.getElementById(`jobs-${key}`);
+  if (el) el.classList.toggle('open');
+};
+
+// View tabs
+document.querySelectorAll('.view-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    const view = tab.dataset.view;
+    stockSection.style.display = view === 'stock' ? 'block' : 'none';
+    purchasingSection.style.display = view === 'purchasing' ? 'block' : 'none';
+  });
+});
+
+searchInput.addEventListener('input', renderStockList);
+filterSelect.addEventListener('change', renderStockList);
+
+// ── Reset ─────────────────────────────────────────────────────────────────
+resetBtn.addEventListener('click', () => {
+  if (!confirm('Reset everything and start again?')) return;
+  state.files = [];
+  state.jobs = [];
+  state.masterList = [];
+  fileList.innerHTML = '';
+  parseControls.style.display = 'none';
+  progressWrap.style.display = 'none';
+  progressBar.style.width = '0%';
+  parseBtn.disabled = false;
+  document.getElementById('upload-section').style.display = 'block';
+  summarySection.style.display = 'none';
+  stockSection.style.display = 'none';
+  purchasingSection.style.display = 'none';
+  exportBar.style.display = 'none';
+  resetBtn.style.display = 'none';
+  fileInput.value = '';
+});
+
+// ── Export ────────────────────────────────────────────────────────────────
+document.getElementById('export-csv-btn').addEventListener('click', () => {
+  const rows = [['Item', 'SKU', 'Total Qty', 'Unit', 'Jobs', 'Status']];
+  state.masterList.forEach(item => {
+    const jobStr = item.jobs.map(j => `${j.jobName}:${j.qty}`).join(' | ');
+    rows.push([item.name, item.sku, item.qty, item.unit, jobStr, item.status]);
+  });
+  downloadCsv(rows, `stock-check-${dateStr()}.csv`);
+  showToast('Full stock list exported');
+});
+
+document.getElementById('export-purchasing-btn').addEventListener('click', () => {
+  const short = state.masterList.filter(i => i.status === 'short');
+  if (!short.length) { showToast('No items flagged short yet'); return; }
+  const rows = [['Item', 'SKU', 'Total Qty', 'Unit', 'Jobs needed']];
+  short.forEach(item => {
+    const jobStr = item.jobs.map(j => `${j.jobName} (${j.qty})`).join(', ');
+    rows.push([item.name, item.sku, item.qty, item.unit, jobStr]);
+  });
+  downloadCsv(rows, `purchasing-list-${dateStr()}.csv`);
+  showToast('Purchasing list exported');
+});
+
+function downloadCsv(rows, filename) {
+  const csv = rows.map(r => r.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+}
+
+function dateStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────
+function setProgress(pct) {
+  progressBar.style.width = pct + '%';
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+// Init pdf.js on load
+loadPdfJs().catch(console.error);
+</script>
+</body>
+</html>
