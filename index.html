@@ -1,7 +1,8 @@
-<!-- Annick Stock Check · v1.4.0 · 2026-06-05
+<!-- Annick Stock Check · v1.4.3 · 2026-06-05
      Changes: persistence (localStorage), resume session banner,
      PDF overlay with line item numbers, quote number on file pills,
-     partial stock quantity input, pluralisation, bundle/catalogue skip fix -->
+     partial stock quantity input, pluralisation, bundle/catalogue skip fix
+     v1.4.3: fix em dash in nudge, pointer-events on nudge, touch-action on buttons -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -108,7 +109,7 @@ main{max-width:800px;margin:0 auto;padding:1.5rem 1rem 5rem}
 /* ── ITEM ROWS ── */
 .item-list{display:flex;flex-direction:column;gap:6px}
 .item-row{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
-  padding:12px 14px;box-shadow:var(--shadow);transition:border-color .12s}
+  padding:12px 14px;box-shadow:var(--shadow);transition:border-color .12s;touch-action:manipulation;-webkit-user-select:none;user-select:none}
 .item-row.in-stock{border-left:3px solid var(--green)}
 .item-row.partial{border-left:3px solid var(--amber)}
 .item-row.short{border-left:3px solid var(--red)}
@@ -127,7 +128,7 @@ main{max-width:800px;margin:0 auto;padding:1.5rem 1rem 5rem}
 .check-buttons{display:flex;gap:4px}
 .check-btn{width:36px;height:36px;border-radius:var(--radius-sm);border:1px solid var(--border);
   background:var(--bg);cursor:pointer;display:flex;align-items:center;justify-content:center;
-  font-size:15px;transition:all .1s;color:var(--text-muted);flex-shrink:0}
+  font-size:15px;transition:all .1s;color:var(--text-muted);flex-shrink:0;touch-action:manipulation}
 .check-btn:active{transform:scale(.92)}
 .check-btn.tick.active{background:var(--green-light);border-color:var(--green);color:var(--green)}
 .check-btn.part.active{background:var(--amber-light);border-color:var(--amber);color:var(--amber-dark)}
@@ -220,7 +221,7 @@ main{max-width:800px;margin:0 auto;padding:1.5rem 1rem 5rem}
 /* ── UNSAVED NUDGE ── */
 #unsaved-nudge{display:none;position:fixed;bottom:72px;left:50%;transform:translateX(-50%);
   background:#fbbf24;color:#78350f;padding:8px 16px;border-radius:999px;
-  font-size:12px;font-weight:600;z-index:49;white-space:nowrap;box-shadow:var(--shadow)}
+  font-size:12px;font-weight:600;z-index:49;white-space:nowrap;box-shadow:var(--shadow);pointer-events:none}
 
 .empty-state{text-align:center;padding:3rem 1rem;color:var(--text-muted)}
 .empty-state-icon{font-size:2.5rem;margin-bottom:.5rem}
@@ -321,7 +322,7 @@ main{max-width:800px;margin:0 auto;padding:1.5rem 1rem 5rem}
   </div>
 </div>
 
-<div id="unsaved-nudge">⚠ Unsaved flags — export before closing</div>
+<div id="unsaved-nudge">Unsaved flags - export before closing</div>
 <div id="toast"></div>
 
 <!-- PDF Overlay -->
@@ -622,6 +623,8 @@ function renderAll() {
   $('export-bar').style.display='flex';
   $('reset-btn').style.display='';
   updateStats(); renderStockList(); renderPurchasingList(); updateUnsavedNudge();
+  // Break iOS ghost-tap chain after re-render
+  requestAnimationFrame(() => window.scrollTo(0, 1));
 }
 
 function updateStats() {
@@ -673,7 +676,7 @@ function itemRowHTML(item) {
     const hasFile = !!fileBlobMap[j.filename];
     const lineLabel = j.lineNum ? ` · item ${j.lineNum}` : '';
     const pdfBtn = hasFile
-      ? `<button class="job-tag-pdf" title="View PDF" onclick="openPdf('${h(j.filename)}','${h(j.jobName)}','${h(item.name)}',this)">📄</button>`
+      ? `<button class="job-tag-pdf" title="View PDF" data-action="open-pdf" data-filename="${h(j.filename)}" data-jobname="${h(j.jobName)}" data-itemname="${h(item.name)}">📄</button>`
       : `<span class="job-tag-pdf" title="Re-upload PDF to view" style="opacity:.4;cursor:default">📄</span>`;
     return `<span class="job-tag${hasFile?'':' no-pdf'}">
       ${h(j.jobName)} · ${j.qty} ${pluralise(j.qty,item.unit)}${lineLabel} ${pdfBtn}
@@ -697,7 +700,7 @@ function itemRowHTML(item) {
       <div class="item-name" title="${h(item.name)}">${h(item.name)}</div>
       <div class="item-meta">
         ${sku}${bn}
-        <button class="jobs-toggle" onclick="toggleJobs('${k}')">
+        <button class="jobs-toggle" data-action="toggle-jobs" data-key="${k}">
           ${item.jobs.length} job${item.jobs.length!==1?'s':''} ↓
         </button>
       </div>
@@ -705,17 +708,16 @@ function itemRowHTML(item) {
     </div>
     <div class="item-qty">${item.qty}<span class="item-qty-unit"> ${unit}</span></div>
     <div class="check-buttons">
-      <button class="check-btn tick ${tickA}"  title="In stock" onclick="setStatus('${k}','in-stock')">✓</button>
-      <button class="check-btn part ${partA}"  title="Partial — some stock" onclick="setStatus('${k}','partial')">~</button>
-      <button class="check-btn cross ${crossA}" title="Short — none in stock" onclick="setStatus('${k}','short')">✗</button>
+      <button class="check-btn tick ${tickA}"  title="In stock" data-action="status" data-key="${k}" data-status="in-stock">✓</button>
+      <button class="check-btn part ${partA}"  title="Partial — some stock" data-action="status" data-key="${k}" data-status="partial">~</button>
+      <button class="check-btn cross ${crossA}" title="Short — none in stock" data-action="status" data-key="${k}" data-status="short">✗</button>
     </div>
   </div>
   <div class="partial-panel ${panelOpen}" id="panel-${k}">
     <span class="partial-label">Have in stock:</span>
     <input class="partial-input" type="number" min="0" max="${item.qty}"
       value="${haveVal}" placeholder="0"
-      oninput="updateHave('${k}',this.value)"
-      onclick="event.stopPropagation()">
+      data-action="have-qty" data-key="${k}">
     <span class="partial-label">of ${item.qty} ${unit} needed</span>
     ${sfText}
   </div>
@@ -787,7 +789,7 @@ function purchRowHTML(item) {
 }
 
 // ── PDF Overlay ───────────────────────────────────────────────────────────
-window.openPdf = async function(filename, jobName, itemName, btnEl) {
+window.openPdf = async function(filename, jobName, itemName) {
   const file = fileBlobMap[filename];
   const overlay = $('pdf-overlay');
   $('pdf-overlay-title').textContent = `${jobName} — packing slip`;
@@ -837,112 +839,131 @@ document.addEventListener('keydown', e => {
   if (e.key==='Escape') { $('pdf-overlay').classList.remove('open'); document.body.style.overflow=''; }
 });
 
-// ── Interactions ──────────────────────────────────────────────────────────
-window.setStatus = function(key, status) {
-  const item=state.masterList.find(i=>i.key===key);
-  if (!item) return;
-  if (item.status===status) { item.status='unchecked'; item.haveQty=null; }
-  else { item.status=status; if (status!=='partial') item.haveQty=null; }
-  updateStats(); renderStockList(); renderPurchasingList();
-  updateUnsavedNudge(); saveSession();
-};
+// ── Delegated event listeners ────────────────────────────────────────────
+// Using data attributes instead of inline onclick to avoid JS string quoting
+// issues with item keys that contain apostrophes (e.g. "Panel Match 'Forever' Silicone")
 
-window.updateHave = function(key, val) {
-  const item=state.masterList.find(i=>i.key===key);
+document.addEventListener('click', e => {
+  const btn = e.target.closest('[data-action]');
+  if (!btn) return;
+  e.stopPropagation();
+  const action = btn.dataset.action;
+  const key    = btn.dataset.key;
+
+  if (action === 'status') {
+    const status = btn.dataset.status;
+    const item   = state.masterList.find(i => i.key === key);
+    if (!item) return;
+    if (item.status === status) { item.status = 'unchecked'; item.haveQty = null; }
+    else { item.status = status; if (status !== 'partial') item.haveQty = null; }
+    updateStats(); renderStockList(); renderPurchasingList();
+    updateUnsavedNudge(); saveSession();
+  }
+
+  if (action === 'toggle-jobs') {
+    const el = document.getElementById('jobs-' + key);
+    if (el) el.classList.toggle('open');
+  }
+
+  if (action === 'open-pdf') {
+    openPdf(btn.dataset.filename, btn.dataset.jobname, btn.dataset.itemname);
+  }
+});
+
+document.addEventListener('input', e => {
+  const inp = e.target.closest('[data-action="have-qty"]');
+  if (!inp) return;
+  const key  = inp.dataset.key;
+  const item = state.masterList.find(i => i.key === key);
   if (!item) return;
-  const n=parseInt(val);
-  item.haveQty=isNaN(n)||n<0?null:Math.min(n,item.qty);
-  const panel=$(`panel-${key}`);
+  const n = parseInt(inp.value);
+  item.haveQty = isNaN(n) || n < 0 ? null : Math.min(n, item.qty);
+  const panel = document.getElementById('panel-' + key);
   if (panel) {
-    const sfEl=panel.querySelector('.partial-shortfall,.partial-hint');
-    const sf=item.haveQty!==null?Math.max(0,item.qty-item.haveQty):null;
+    const sfEl = panel.querySelector('.partial-shortfall,.partial-hint');
+    const sf   = item.haveQty !== null ? Math.max(0, item.qty - item.haveQty) : null;
     if (sfEl) {
-      if (sf!==null) { sfEl.className='partial-shortfall'; sfEl.textContent=`Order ${sf} ${pluralise(sf,item.unit)}`; }
-      else { sfEl.className='partial-hint'; sfEl.textContent='Enter quantity on hand'; }
+      if (sf !== null) { sfEl.className = 'partial-shortfall'; sfEl.textContent = `Order ${sf} ${pluralise(sf, item.unit)}`; }
+      else             { sfEl.className = 'partial-hint';       sfEl.textContent = 'Enter quantity on hand'; }
     }
   }
   renderPurchasingList(); updateStats(); saveSession();
-};
+});
 
-window.toggleJobs = function(key) {
-  const el=$(`jobs-${key}`);
-  if (el) el.classList.toggle('open');
-};
-
-document.querySelectorAll('.view-tab').forEach(tab=>{
-  tab.addEventListener('click',()=>{
-    document.querySelectorAll('.view-tab').forEach(t=>t.classList.remove('active'));
+document.querySelectorAll('.view-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.view-tab').forEach(t => t.classList.remove('active'));
     tab.classList.add('active');
-    const v=tab.dataset.view;
-    $('stock-section').style.display     =v==='stock'?'block':'none';
-    $('purchasing-section').style.display=v==='purchasing'?'block':'none';
+    const v = tab.dataset.view;
+    $('stock-section').style.display      = v === 'stock'      ? 'block' : 'none';
+    $('purchasing-section').style.display = v === 'purchasing' ? 'block' : 'none';
   });
 });
 
 $('search-input').addEventListener('input', renderStockList);
 $('filter-select').addEventListener('change', renderStockList);
 
-$('reset-btn').addEventListener('click', ()=>{
+$('reset-btn').addEventListener('click', () => {
   if (!confirm('Reset everything and start fresh?')) return;
   clearSession();
-  state.files=[]; state.jobs=[]; state.masterList=[];
-  Object.keys(fileBlobMap).forEach(k=>delete fileBlobMap[k]);
-  $('file-list').innerHTML='';
-  $('parse-controls').style.display='none';
-  $('progress-bar-wrap').style.display='none';
-  $('progress-bar').style.width='0%';
-  $('parse-btn').disabled=false;
-  $('upload-section').style.display='block';
-  $('summary-section').style.display='none';
-  $('stock-section').style.display='none';
-  $('purchasing-section').style.display='none';
-  $('export-bar').style.display='none';
-  $('reset-btn').style.display='none';
-  $('unsaved-nudge').style.display='none';
-  fileInput.value='';
+  state.files = []; state.jobs = []; state.masterList = [];
+  Object.keys(fileBlobMap).forEach(k => delete fileBlobMap[k]);
+  $('file-list').innerHTML = '';
+  $('parse-controls').style.display = 'none';
+  $('progress-bar-wrap').style.display = 'none';
+  $('progress-bar').style.width = '0%';
+  $('parse-btn').disabled = false;
+  $('upload-section').style.display = 'block';
+  $('summary-section').style.display = 'none';
+  $('stock-section').style.display = 'none';
+  $('purchasing-section').style.display = 'none';
+  $('export-bar').style.display = 'none';
+  $('reset-btn').style.display = 'none';
+  $('unsaved-nudge').style.display = 'none';
+  fileInput.value = '';
 });
 
-// Warn before unload if unsaved flags
-window.addEventListener('beforeunload', e=>{
-  const hasAction=state.masterList.some(i=>i.status==='short'||i.status==='partial');
-  if (hasAction) { e.preventDefault(); e.returnValue=''; }
+window.addEventListener('beforeunload', e => {
+  const hasAction = state.masterList.some(i => i.status === 'short' || i.status === 'partial');
+  if (hasAction) { e.preventDefault(); e.returnValue = ''; }
 });
 
 // ── Export ────────────────────────────────────────────────────────────────
-$('export-csv-btn').addEventListener('click',()=>{
-  const rows=[['Item','SKU','Total Qty','Unit','Jobs','Status','Have','To Order']];
-  state.masterList.forEach(item=>{
-    const have=item.status==='short'?0:(item.haveQty??'');
-    const order=item.status==='short'?item.qty:item.haveQty!==null?Math.max(0,item.qty-item.haveQty):'';
-    rows.push([item.name,item.sku||'',item.qty,item.unit,
-      item.jobs.map(j=>`${j.jobName}:${j.qty}`).join(' | '),
-      item.status,have,order]);
+$('export-csv-btn').addEventListener('click', () => {
+  const rows = [['Item','SKU','Total Qty','Unit','Jobs','Status','Have','To Order']];
+  state.masterList.forEach(item => {
+    const have  = item.status === 'short' ? 0 : (item.haveQty ?? '');
+    const order = item.status === 'short' ? item.qty : item.haveQty !== null ? Math.max(0, item.qty - item.haveQty) : '';
+    rows.push([item.name, item.sku||'', item.qty, item.unit,
+      item.jobs.map(j => `${j.jobName}:${j.qty}`).join(' | '),
+      item.status, have, order]);
   });
-  dlCsv(rows,`stock-check-${ds()}.csv`);
+  dlCsv(rows, `stock-check-${ds()}.csv`);
   showToast('Full stock list exported');
 });
 
-$('export-purchasing-btn').addEventListener('click',()=>{
-  const action=state.masterList.filter(i=>i.status==='short'||i.status==='partial');
-  if (!action.length){ showToast('No items flagged yet'); return; }
-  const rows=[['Item','SKU','Needed','Unit','In Stock','To Order','Status','Jobs']];
-  action.forEach(item=>{
-    const have=item.status==='short'?0:(item.haveQty??0);
-    const order=Math.max(0,item.qty-have);
-    rows.push([item.name,item.sku||'',item.qty,item.unit,have,order,item.status,
-      item.jobs.map(j=>`${j.jobName} (item ${j.lineNum||'?'}, ${j.qty} ${pluralise(j.qty,item.unit)})`).join(', ')]);
+$('export-purchasing-btn').addEventListener('click', () => {
+  const action = state.masterList.filter(i => i.status === 'short' || i.status === 'partial');
+  if (!action.length) { showToast('No items flagged yet'); return; }
+  const rows = [['Item','SKU','Needed','Unit','In Stock','To Order','Status','Jobs']];
+  action.forEach(item => {
+    const have  = item.status === 'short' ? 0 : (item.haveQty ?? 0);
+    const order = Math.max(0, item.qty - have);
+    rows.push([item.name, item.sku||'', item.qty, item.unit, have, order, item.status,
+      item.jobs.map(j => `${j.jobName} (item ${j.lineNum||'?'}, ${j.qty} ${pluralise(j.qty, item.unit)})`).join(', ')]);
   });
-  dlCsv(rows,`purchasing-list-${ds()}.csv`);
+  dlCsv(rows, `purchasing-list-${ds()}.csv`);
   showToast('Purchasing list exported');
 });
 
-function dlCsv(rows,fn) {
-  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
-  const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));
-  a.download=fn; a.click();
+function dlCsv(rows, fn) {
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+  a.download = fn; a.click();
 }
-function ds() { return new Date().toISOString().slice(0,10); }
-function h(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function ds()        { return new Date().toISOString().slice(0,10); }
+function h(s)        { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function showToast(msg) { const t=$('toast'); t.textContent=msg; t.classList.add('show'); setTimeout(()=>t.classList.remove('show'),2500); }
 
 loadPdfJs().catch(console.error);
