@@ -1,6 +1,7 @@
-<!-- Annick Stock Check · v2.0.0 · 2026-06-05
+<!-- Annick Stock Check · v2.0.1 · 2026-06-05
      v2.0.0: Supabase multi-user sync — office uploads/parses, warehouse checks via session code
-     Real-time status sync, session persistence, PDF viewer, partial stock input -->
+     Real-time status sync, session persistence, PDF viewer, partial stock input
+     v2.0.1: fix PDF button tap target on mobile — larger size, padding, re-enabled tap events -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -162,13 +163,18 @@ main{max-width:800px;margin:0 auto;padding:1.5rem 1rem 5rem}
 .check-btn.tick.active{background:var(--green-light);border-color:var(--green);color:var(--green)}
 .check-btn.part.active{background:var(--amber-light);border-color:var(--amber);color:var(--amber-dark)}
 .check-btn.cross.active{background:var(--red-light);border-color:var(--red);color:var(--red-dark)}
-.item-jobs{display:none;margin-top:8px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:8px}
+.item-jobs{display:none;margin-top:8px;font-size:12px;color:var(--text-muted);border-top:1px solid var(--border);padding-top:8px;
+  -webkit-user-select:none;user-select:none;touch-action:manipulation}
 .item-jobs.open{display:block}
-.job-tag{display:inline-flex;align-items:center;gap:4px;background:var(--teal-light);
-  color:var(--teal-dark);border-radius:999px;padding:3px 8px;font-size:11px;font-weight:600;margin:2px 3px 2px 0}
-.job-tag-pdf{background:none;border:none;cursor:pointer;color:var(--teal-dark);font-size:11px;
-  font-weight:700;padding:0 0 0 2px;opacity:.7;font-family:inherit;touch-action:manipulation}
-.job-tag-pdf:hover{opacity:1}
+.job-tag{display:inline-flex;align-items:center;gap:2px;background:var(--teal-light);
+  color:var(--teal-dark);border-radius:999px;padding:3px 4px 3px 8px;font-size:11px;font-weight:600;margin:2px 3px 2px 0;
+  -webkit-user-select:none;user-select:none}
+.job-tag-pdf{background:none;border:none;cursor:pointer;color:var(--teal-dark);font-size:14px;
+  font-weight:700;padding:4px 6px;opacity:.8;font-family:inherit;touch-action:manipulation;
+  -webkit-user-select:none;user-select:none;min-width:28px;min-height:28px;
+  display:inline-flex;align-items:center;justify-content:center;border-radius:4px;
+  -webkit-tap-highlight-color:rgba(13,148,136,.2)}
+.job-tag-pdf:hover,.job-tag-pdf:active{opacity:1;background:rgba(13,148,136,.15)}
 .partial-panel{margin-top:10px;padding:10px 12px;background:var(--amber-light);
   border-radius:var(--radius-sm);border:1px solid var(--amber);display:none}
 .partial-panel.open{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
@@ -947,9 +953,10 @@ async function saveCheck(item) {
 document.addEventListener('click', e => {
   const btn = e.target.closest('[data-action]');
   if (!btn) return;
-  e.stopPropagation();
+  // Only stop propagation for status changes, not PDF buttons
   const action = btn.dataset.action;
   const key    = btn.dataset.key;
+  if (action === 'status') e.stopPropagation();
 
   if (action === 'status') {
     const status = btn.dataset.status;
