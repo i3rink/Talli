@@ -999,7 +999,7 @@
     state.role    = 'warehouse';
     state.view    = 'check';
     const { data: existingChecks } = await sb.from('checks')
-      .select('*').eq('session_id', data.id).order('created_at', { ascending: false });
+      .select('*').eq('session_id', data.id).order('updated_at', { ascending: false });
     if (existingChecks) {
       const masterList = data.master_list || [];
       // Build a lookup: normalised name -> master key
