@@ -1006,14 +1006,13 @@
       const nameToKey = new Map();
       for (const item of masterList) {
         nameToKey.set(item.key.toLowerCase().trim(), item.key);
+        if (item.sku) nameToKey.set(item.sku.toLowerCase().trim(), item.key);
         nameToKey.set(item.name.toLowerCase().trim(), item.key);
       }
       const seen = new Set();
       for (const c of existingChecks) {
         if (!c.status || c.status === 'unchecked') continue;
-        // Try direct key match first, then fallback to name lookup
-        const directKey = c.item_key;
-        const resolvedKey = nameToKey.get(directKey.toLowerCase().trim()) || directKey;
+        const resolvedKey = nameToKey.get(c.item_key.toLowerCase().trim()) || c.item_key;
         if (!seen.has(resolvedKey)) {
           seen.add(resolvedKey);
           state.checks[resolvedKey] = { status: c.status, haveQty: c.have_qty };
