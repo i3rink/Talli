@@ -24,7 +24,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
-    /* ── Version: 2.3.3 ── */
+    /* ── Version: 2.3.4 ── */
 
     :root {
       --teal:        #0075ab;
@@ -454,7 +454,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span id="header-sub">v2.3.3</span>
+      <span id="header-sub">v2.3.4</span>
     </div>
   </div>
 
@@ -492,7 +492,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
   const MODULE_LABELS = {
-    home: 'v2.3.3',
+    home: 'v2.3.4',
     verifier: 'Pick Verifier',
     completion: 'Pick Completion',
     delivery: 'Driver Delivery',
@@ -528,6 +528,7 @@
     driveToken:      null,
     pickerApiLoaded: false,
     stagedFiles:     [],   /* files queued before session creation */
+    catExpanded:     {},   /* category open/closed state in check view */
     /* module 2 — pick completion */
     c2: { session: null, selectedJob: null, picks: {}, loading: false },
     /* module 3 — driver delivery */
@@ -746,36 +747,166 @@
       <button class="btn btn-ghost mt-2" data-action="back-upload">&#8592; Upload different files</button>`;
   }
 
+  /* ── Category rules — keyword/SKU matching ── */
+  const CAT_ORDER = ['Wet Areas','Glassware','Furniture','Brassware','Panels','Flooring','Sundries'];
+  const CAT_RULES = [
+    ['Wet Areas', [
+      [/\bshower tray\b/i,'b'],[/\banti.slip.*tray\b/i,'n'],[/\bwetroom\b(?!.*screen)/i,'b'],
+      [/S8-WET/i,'s'],[/S8-PROFILE/i,'s'],[/\bshower set\b/i,'n'],[/^RR-/i,'s'],
+      [/\bshower trap\b/i,'n'],[/\bbottle trap\b/i,'n'],[/\bbath trap\b/i,'n'],
+      [/\bpan connector\b/i,'n'],[/\bflexi\b/i,'n'],[/\bisolation val/i,'n'],
+      [/\bextractor fan\b/i,'n'],[/^CEF-/i,'s'],[/\bheating element\b/i,'n'],
+      [/^HB\d/i,'s'],[/\belectric shower\b/i,'n'],[/^TS-\d/i,'s'],
+      [/\briser\b/i,'n'],[/^NEV-/i,'s'],
+      [/\bbath\b(?!.*(?:filler|mixer|tap|waste|pop.up|screen|wall))/i,'n'],
+    ]],
+    ['Glassware', [
+      [/S6-.*GLASS/i,'s'],[/BLKSCREEN/i,'s'],[/GRIDBATHSCREEN/i,'s'],[/^GRID\d/i,'s'],
+      [/\bbathscreen\b/i,'n'],[/\bbath screen\b/i,'n'],[/\bwetroom screen\b/i,'n'],
+      [/\bgrid.*screen\b/i,'n'],[/\bside panel.*mm\b/i,'n'],[/\bpivot door\b/i,'n'],
+      [/\bsliding.*door\b/i,'n'],[/\bdouble door quad\b/i,'n'],
+      [/S8-FLIPPER/i,'s'],[/\bdeflector panel\b/i,'n'],
+    ]],
+    ['Brassware', [
+      [/^TAP\d/i,'s'],[/^SAN\d/i,'s'],[/^BLACK2\d/i,'s'],[/^BR-BRASS/i,'s'],
+      [/\bmixer\b/i,'n'],[/\bbath filler\b/i,'n'],[/\btap\b/i,'n'],[/\bdeck mounted\b/i,'n'],
+      [/^TRV\d/i,'s'],[/^C15-/i,'s'],[/^ST-\d/i,'s'],[/^VI-/i,'s'],[/^TS-29079/i,'s'],
+      [/\btowel rail\b/i,'n'],[/\bradiator valve\b/i,'n'],[/\bpipe collars?\b/i,'n'],
+      [/\bshower dome\b/i,'n'],[/\bvibe.*rail\b/i,'n'],[/\bbrass.*rail\b/i,'n'],
+      [/\bhandle\b/i,'n'],[/\bpush button\b/i,'n'],[/\bgrab rail\b/i,'n'],
+      [/\bbath.*waste\b/i,'n'],[/\bpop.up waste\b/i,'n'],[/^BW\d/i,'s'],[/^BLACKBW/i,'s'],
+    ]],
+    ['Furniture', [
+      [/^NVF/i,'s'],[/^nvf/i,'s'],[/^NVM/i,'s'],[/^nvm/i,'s'],
+      [/^PMB/i,'s'],[/^pmb/i,'s'],[/^NCG/i,'s'],[/^ncg/i,'s'],
+      [/^NBC/i,'s'],[/^PRC/i,'s'],[/^BTW/i,'s'],[/^NST/i,'s'],
+      [/^XTY/i,'s'],[/^AR-\d/i,'s'],[/^BU-1050/i,'s'],
+      [/^moe\d/i,'s'],[/^sat\d/i,'s'],[/^SPACE\d/i,'s'],
+      [/^DEIA\d/i,'s'],[/^VESSEL/i,'s'],[/^mwt\d/i,'s'],[/^off\d/i,'s'],[/^vty\d/i,'s'],
+      [/\bvanity\b/i,'n'],[/\bcabinet\b/i,'n'],[/\bcab\b/i,'n'],[/\bwc unit\b/i,'n'],
+      [/\bbasin\b/i,'n'],[/\bpan.*seat\b/i,'n'],[/\bcistern\b/i,'n'],
+      [/\bpolymarble\b/i,'n'],[/\btall unit\b/i,'n'],[/\bpedestal\b/i,'n'],
+      [/\bcountertop basin\b/i,'n'],[/\bspa basin\b/i,'n'],[/\brimless.*pan\b/i,'n'],
+      [/\bsoft close seat\b/i,'n'],[/999-SEAT/i,'s'],
+      [/\bmirror\b/i,'n'],[/^SK-LED/i,'s'],[/^MIRROR\d/i,'s'],[/^MONO-\d/i,'s'],[/^ANN-REC/i,'s'],
+      [/\bled battery mirror\b/i,'n'],
+    ]],
+    ['Panels', [
+      [/^FF8-/i,'s'],[/^ff8-/i,'s'],[/^FF10-/i,'s'],[/^FFP10-/i,'s'],
+      [/^FFTL-/i,'s'],[/^SK250-/i,'s'],
+      [/^SK-CL/i,'s'],[/^SK-CE/i,'s'],[/^SK-BL/i,'s'],[/^SK-BE/i,'s'],
+      [/\bl trim\b/i,'n'],[/\bend cap\b/i,'n'],[/\bh trim\b/i,'n'],
+      [/\bperform panel/i,'n'],[/\bwall panel\b/i,'n'],[/\bpanel\b/i,'n'],
+      [/\btile\b/i,'n'],[/\btile line\b/i,'n'],
+      [/\bmarble\b/i,'n'],[/\bquartz\b/i,'n'],[/\bonyx\b/i,'n'],
+      [/\b250 x 2700\b/i,'n'],
+    ]],
+    ['Flooring', [
+      [/^LRSPC-/i,'s'],[/^LRMSPC-/i,'s'],[/^FRSPC-/i,'s'],[/^FRHSPC-/i,'s'],
+      [/\bspc\b/i,'b'],[/\blvt\b/i,'b'],
+      [/\bflooring\b/i,'n'],[/\bleaf range\b/i,'n'],[/\bforest range\b/i,'n'],
+      [/\bherringbone\b/i,'n'],[/\bpine\b/i,'n'],[/\boak\b/i,'n'],
+    ]],
+    ['Sundries', [
+      [/^EB-/i,'s'],[/\bsilicone\b/i,'n'],[/\bsealant\b/i,'n'],
+      [/\bnail\b/i,'n'],[/\bosb\b/i,'n'],[/\bchipboard\b/i,'n'],
+      [/\boffsaw\b/i,'n'],[/\bcls\b/i,'n'],[/\bdownlight\b/i,'n'],
+      [/\bchauk\b/i,'n'],[/\bterminal\b/i,'n'],[/\btwin.*earth\b/i,'n'],
+      [/\belectrical kit\b/i,'n'],
+    ]],
+  ];
+
+  function categoriseItem(sku, name) {
+    for (const [cat, rules] of CAT_RULES) {
+      for (const [re, field] of rules) {
+        if ((field === 's' || field === 'b') && re.test(sku)) return cat;
+        if ((field === 'n' || field === 'b') && re.test(name)) return cat;
+      }
+    }
+    return 'Sundries';
+  }
+
+  function renderItemRow(item, checks) {
+    const c = checks[item.key] || {};
+    const st = c.status || '';
+    const skuHtml  = item.sku  ? `<span class="item-sku">${esc(item.sku)}</span>` : '';
+    const unitHtml = item.unit ? ' ' + esc(item.unit) : '';
+    return `
+      <div class="item-row ${st ? 'status-' + (st === 'in' ? 'in' : st === 'part' ? 'part' : 'short') : ''}" data-key="${esc(item.key)}">
+        <div class="item-name">${esc(item.name)}${skuHtml}</div>
+        <div class="item-qty">Qty: ${item.qty}${unitHtml}</div>
+        ${st === 'part' ? `<input class="qty-input" type="number" min="0" max="${item.qty}" placeholder="Have?" value="${c.haveQty || ''}" data-action="qty-input" data-key="${esc(item.key)}" />` : ''}
+        <div class="item-status">
+          <button class="status-btn ${st === 'in'    ? 'active-green' : ''}" data-action="set-status" data-key="${esc(item.key)}" data-status="in"    title="In stock">&#10003;</button>
+          <button class="status-btn ${st === 'part'  ? 'active-amber' : ''}" data-action="set-status" data-key="${esc(item.key)}" data-status="part"  title="Partial">~</button>
+          <button class="status-btn ${st === 'short' ? 'active-red'   : ''}" data-action="set-status" data-key="${esc(item.key)}" data-status="short" title="Short">&#10007;</button>
+        </div>
+      </div>`;
+  }
+
   function renderCheck() {
-    const items = state.session.masterList;
+    const items  = state.session.masterList;
     const checks = state.checks;
-    const total = items.length;
-    const done  = Object.values(checks).filter(c => c.status).length;
-    const pct   = total ? Math.round((done / total) * 100) : 0;
+    const total  = items.length;
+    const done   = Object.values(checks).filter(c => c.status).length;
+    const pct    = total ? Math.round((done / total) * 100) : 0;
 
-    let filtered = items;
-    if (state.tab === 'short')     filtered = items.filter(i => checks[i.key]?.status === 'short');
-    if (state.tab === 'in')        filtered = items.filter(i => checks[i.key]?.status === 'in');
-    if (state.tab === 'remaining') filtered = items.filter(i => !checks[i.key]?.status);
+    /* flat filtered views for Short and In Stock tabs */
+    if (state.tab === 'short' || state.tab === 'in') {
+      const filtered = items.filter(i =>
+        state.tab === 'short'
+          ? (checks[i.key]?.status === 'short' || checks[i.key]?.status === 'part')
+          : checks[i.key]?.status === 'in'
+      );
+      const rows = filtered.map(i => renderItemRow(i, checks)).join('');
+      return renderCheckShell(total, done, pct, checks,
+        rows || `<div class="empty-state"><div class="icon">&#10003;</div><p>Nothing here</p></div>`);
+    }
 
-    const rows = filtered.map(item => {
-      const c = checks[item.key] || {};
-      const st = c.status || '';
-      const skuHtml  = item.sku  ? `<span class="item-sku">${esc(item.sku)}</span>` : '';
-      const unitHtml = item.unit ? ' ' + esc(item.unit) : '';
+    /* All and Remaining — grouped by category */
+    const showItems = state.tab === 'remaining'
+      ? items.filter(i => !checks[i.key]?.status)
+      : items;
+
+    /* build per-category buckets */
+    const buckets = {};
+    CAT_ORDER.forEach(c => buckets[c] = []);
+    showItems.forEach(i => buckets[categoriseItem(i.sku || '', i.name)].push(i));
+
+    const catColours = {
+      'Wet Areas':  '#0075ab', 'Glassware':  '#0891b2',
+      'Furniture':  '#059669', 'Brassware':  '#d97706',
+      'Panels':     '#7c3aed', 'Flooring':   '#b45309',
+      'Sundries':   '#64748b',
+    };
+
+    const sections = CAT_ORDER.map(cat => {
+      const catItems = buckets[cat];
+      if (!catItems.length) return '';
+      const catDone = catItems.filter(i => checks[i.key]?.status).length;
+      const isOpen  = state.catExpanded?.[cat] !== false; /* open by default */
+      const colour  = catColours[cat];
+      const rows    = catItems.map(i => renderItemRow(i, checks)).join('');
       return `
-        <div class="item-row ${st ? 'status-' + (st === 'in' ? 'in' : st === 'part' ? 'part' : 'short') : ''}" data-key="${esc(item.key)}">
-          <div class="item-name">${esc(item.name)}${skuHtml}</div>
-          <div class="item-qty">Qty: ${item.qty}${unitHtml}</div>
-          ${st === 'part' ? `<input class="qty-input" type="number" min="0" max="${item.qty}" placeholder="Have?" value="${c.haveQty || ''}" data-action="qty-input" data-key="${esc(item.key)}" />` : ''}
-          <div class="item-status">
-            <button class="status-btn ${st === 'in'    ? 'active-green' : ''}" data-action="set-status" data-key="${esc(item.key)}" data-status="in"    title="In stock">&#10003;</button>
-            <button class="status-btn ${st === 'part'  ? 'active-amber' : ''}" data-action="set-status" data-key="${esc(item.key)}" data-status="part"  title="Partial">~</button>
-            <button class="status-btn ${st === 'short' ? 'active-red'   : ''}" data-action="set-status" data-key="${esc(item.key)}" data-status="short" title="Short">&#10007;</button>
-          </div>
+        <div class="cat-section" style="margin-bottom:8px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+          <button class="cat-head" data-action="toggle-cat" data-cat="${esc(cat)}"
+            style="width:100%;display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg);border:none;cursor:pointer;text-align:left;font-family:inherit;">
+            <div style="width:4px;height:18px;border-radius:2px;background:${colour};flex-shrink:0;"></div>
+            <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.85rem;flex:1;color:var(--text);">${esc(cat)}</div>
+            <div style="font-size:.75rem;color:var(--muted);">${catDone}/${catItems.length}</div>
+            <div style="font-size:.7rem;color:var(--muted);transition:transform .15s;${isOpen ? '' : 'transform:rotate(-90deg);'}">&#9660;</div>
+          </button>
+          <div class="cat-body item-list" style="padding:6px 8px 8px;${isOpen ? '' : 'display:none;'}">${rows}</div>
         </div>`;
     }).join('');
 
+    return renderCheckShell(total, done, pct, checks,
+      sections || `<div class="empty-state"><div class="icon">&#10003;</div><p>Nothing here</p></div>`);
+  }
+
+  function renderCheckShell(total, done, pct, checks, inner) {
+    const shortCount = Object.values(checks).filter(c => c.status === 'short' || c.status === 'part').length;
+    const inCount    = Object.values(checks).filter(c => c.status === 'in').length;
     return `
       <div class="card">
         <div class="flex justify-between items-center" style="margin-bottom:10px;">
@@ -789,10 +920,10 @@
         <div class="tabs">
           <button class="tab-btn ${state.tab === 'all'       ? 'active' : ''}" data-action="tab" data-tab="all">All (${total})</button>
           <button class="tab-btn ${state.tab === 'remaining' ? 'active' : ''}" data-action="tab" data-tab="remaining">Remaining (${total - done})</button>
-          <button class="tab-btn ${state.tab === 'short'     ? 'active' : ''}" data-action="tab" data-tab="short">Short (${Object.values(checks).filter(c => c.status === 'short' || c.status === 'part').length})</button>
-          <button class="tab-btn ${state.tab === 'in'        ? 'active' : ''}" data-action="tab" data-tab="in">In Stock (${Object.values(checks).filter(c => c.status === 'in').length})</button>
+          <button class="tab-btn ${state.tab === 'short'     ? 'active' : ''}" data-action="tab" data-tab="short">Short (${shortCount})</button>
+          <button class="tab-btn ${state.tab === 'in'        ? 'active' : ''}" data-action="tab" data-tab="in">In Stock (${inCount})</button>
         </div>
-        <div class="item-list">${rows || '<div class="empty-state"><div class="icon">&#10003;</div><p>Nothing here</p></div>'}</div>
+        ${inner}
       </div>`;
   }
 
@@ -1115,6 +1246,7 @@
       state.dash = { loading: true, m1: [], m2: [], m3: [] };
       state.c2 = { session: null, selectedJob: null, picks: {}, loading: false };
       state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null };
+      state.catExpanded = {};
       render(); return;
     }
 
@@ -1156,6 +1288,17 @@
     if (action === 'back-upload') { state.view = 'upload'; render(); return; }
     if (action === 'new-session') { state.session = null; state.checks = {}; state.stagedFiles = []; state.view = 'upload'; render(); return; }
     if (action === 'tab')         { state.tab = btn.dataset.tab; render(); return; }
+    if (action === 'toggle-cat')  {
+      const cat = btn.dataset.cat;
+      if (!state.catExpanded) state.catExpanded = {};
+      /* default is open (undefined = open), so toggle to explicit false/true */
+      state.catExpanded[cat] = state.catExpanded[cat] === false ? true : false;
+      const body    = btn.closest('.cat-section')?.querySelector('.cat-body');
+      const chevron = btn.querySelector('div:last-child');
+      if (body)    body.style.display = state.catExpanded[cat] === false ? 'none' : '';
+      if (chevron) chevron.style.transform = state.catExpanded[cat] === false ? 'rotate(-90deg)' : '';
+      return;
+    }
     if (action === 'set-status')  { setStatus(btn.dataset.key, btn.dataset.status); return; }
     if (action === 'copy-report') { copyReport(); return; }
 
