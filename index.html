@@ -24,7 +24,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
-    /* ── Version: 2.3.5 ── */
+    /* ── Version: 2.3.6 ── */
 
     :root {
       --teal:        #0075ab;
@@ -454,7 +454,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span id="header-sub">v2.3.5</span>
+      <span id="header-sub">v2.3.6</span>
     </div>
   </div>
 
@@ -492,7 +492,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
   const MODULE_LABELS = {
-    home: 'v2.3.5',
+    home: 'v2.3.6',
     verifier: 'Pick Verifier',
     completion: 'Pick Completion',
     delivery: 'Driver Delivery',
@@ -1842,7 +1842,7 @@
         </div>
         ${sessionBlocks}
         <div class="dash-footer">
-          <button class="btn btn-ghost" data-action="copy-dash-m1" style="font-size:.8rem;padding:6px 14px;">&#128203; Copy purchasing list</button>
+          <button class="btn btn-ghost" data-action="copy-dash-m1" style="font-size:.8rem;padding:6px 14px;">&#128722; Send purchasing list</button>
         </div>
       </div>`;
     }
@@ -1878,7 +1878,7 @@
         </div>
         ${jobBlocks}
         <div class="dash-footer">
-          <button class="btn btn-ghost" data-action="copy-dash-m2" style="font-size:.8rem;padding:6px 14px;">&#128203; Copy pick shortfalls</button>
+          <button class="btn btn-ghost" data-action="copy-dash-m2" style="font-size:.8rem;padding:6px 14px;">&#128722; Send pick shortfalls</button>
         </div>
       </div>`;
     }
@@ -1915,7 +1915,7 @@
         </div>
         ${jobBlocks}
         <div class="dash-footer">
-          <button class="btn btn-ghost" data-action="copy-dash-m3" style="font-size:.8rem;padding:6px 14px;">&#128203; Copy remedial list</button>
+          <button class="btn btn-ghost" data-action="copy-dash-m3" style="font-size:.8rem;padding:6px 14px;">&#128722; Send remedial list</button>
         </div>
       </div>`;
     }
@@ -1924,6 +1924,32 @@
   }
 
   /* ── Dashboard copy functions ── */
+  /* ── Shared send helper: share sheet on mobile, clipboard fallback on desktop ── */
+  function shareOrCopy(title, text, btnAction) {
+    const canShare = navigator.share && /Mobi|Android|iPhone|iPad/i.test(navigator.userAgent);
+    if (canShare) {
+      navigator.share({ title, text }).catch(() => {});
+    } else {
+      navigator.clipboard.writeText(text).then(() => {
+        /* flash the button to confirm */
+        const btn = document.querySelector(`[data-action="${btnAction}"]`);
+        if (btn) {
+          const orig = btn.innerHTML;
+          btn.innerHTML = '&#10003; Copied!';
+          btn.style.color = 'var(--green)';
+          btn.style.borderColor = 'var(--green)';
+          setTimeout(() => {
+            btn.innerHTML = orig;
+            btn.style.color = '';
+            btn.style.borderColor = '';
+          }, 2000);
+        } else {
+          toast('Copied!');
+        }
+      });
+    }
+  }
+
   function copyDashM1() {
     const { m1 } = state.dash;
     if (!m1 || !m1.length) { toast('Nothing to copy'); return; }
@@ -1934,7 +1960,7 @@
       items.forEach(i => lines.push(`  ${i.name}${i.sku ? ' (' + i.sku + ')' : ''} \u2014 Need ${i.toOrder}`));
       lines.push('');
     });
-    navigator.clipboard.writeText(lines.join('\n')).then(() => toast('Purchasing list copied!'));
+    shareOrCopy('Purchasing Shortfalls', lines.join('\n'), 'copy-dash-m1');
   }
 
   function copyDashM2() {
@@ -1947,7 +1973,7 @@
       items.forEach(i => lines.push(`  ${i.item_name} \u2014 Needed ${i.needed_qty}, Picked ${i.picked_qty}, Short ${i.shortfall}`));
       lines.push('');
     });
-    navigator.clipboard.writeText(lines.join('\n')).then(() => toast('Pick shortfalls copied!'));
+    shareOrCopy('Pick Shortfalls', lines.join('\n'), 'copy-dash-m2');
   }
 
   function copyDashM3() {
@@ -1961,7 +1987,7 @@
       items.forEach(i => lines.push(`  ${i.item_name} \u2014 Expected ${i.picked_qty}, Delivered ${i.delivered_qty}, Short ${i.shortfall}`));
       lines.push('');
     });
-    navigator.clipboard.writeText(lines.join('\n')).then(() => toast('Remedial list copied!'));
+    shareOrCopy('Remedial Deliveries', lines.join('\n'), 'copy-dash-m3');
   }
 
   /* ═══════════════════════════════════════════════
