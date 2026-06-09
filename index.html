@@ -509,6 +509,7 @@
     c4: { screen: 'overview' },
     /* home dashboard */
     dash: { loading: true, m1: [], m2: [], m3: [] },
+    dashUnlocked: false,
   };
 
   /* ═══════════════════════════════════════════════
@@ -573,8 +574,8 @@
   function renderHome() {
     const h = new Date().getHours();
     const greet = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
-    /* Trigger dashboard load after this render cycle */
-    setTimeout(loadDashboard, 0);
+    /* Trigger dashboard load after this render cycle — only if unlocked */
+    if (state.dashUnlocked) setTimeout(loadDashboard, 0);
     return `
       <div class="lp-intro">
         <h1>Good ${greet}.</h1>
@@ -610,9 +611,9 @@
       <div class="dash-wrap">
         <div class="dash-heading">
           <span class="dash-heading-title">Pending actions</span>
-          <button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>
+          ${state.dashUnlocked ? `<button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>` : ''}
         </div>
-        <div id="dashboard"><div class="dash-loading">Loading&#8230;</div></div>
+        <div id="dashboard">${state.dashUnlocked ? '<div class="dash-loading">Loading&#8230;</div>' : renderDashLock()}</div>
       </div>`;
   }
 
@@ -1039,6 +1040,7 @@
     if (action === 'go-home') {
       state.module = 'home'; state.view = 'home';
       state.dash = { loading: true, m1: [], m2: [], m3: [] };
+      /* dashUnlocked is intentionally preserved — PIN entered once per session */
       state.c2 = { session: null, selectedJob: null, picks: {}, loading: false };
       state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null };
       render(); return;
@@ -1048,6 +1050,23 @@
     if (action === 'copy-dash-m1') { copyDashM1(); return; }
     if (action === 'copy-dash-m2') { copyDashM2(); return; }
     if (action === 'copy-dash-m3') { copyDashM3(); return; }
+    if (action === 'dash-unlock') {
+      const input = document.getElementById('dash-pin-input');
+      if (!input) return;
+      if (input.value === DASH_PIN) {
+        state.dashUnlocked = true;
+        const el = document.getElementById('dashboard');
+        if (el) { el.innerHTML = '<div class="dash-loading">Loading&#8230;</div>'; }
+        const heading = document.querySelector('.dash-heading');
+        if (heading) heading.innerHTML = '<span class="dash-heading-title">Pending actions</span><button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>';
+        loadDashboard();
+      } else {
+        const err = document.getElementById('dash-pin-error');
+        if (err) err.textContent = 'Incorrect PIN — try again';
+        if (input) { input.value = ''; input.focus(); }
+      }
+      return;
+    }
 
     /* ── module 1 ── */
     if (action === 'browse-files') { document.getElementById('file-input').click(); return; }
@@ -1371,6 +1390,25 @@
   /* ═══════════════════════════════════════════════
      HOME DASHBOARD
   ═══════════════════════════════════════════════ */
+  const DASH_PIN = '1690';
+
+  function renderDashLock() {
+    return `
+      <div class="dash-section" style="text-align:center;padding:24px 20px;">
+        <div style="font-size:1.4rem;margin-bottom:8px;">&#128274;</div>
+        <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.95rem;margin-bottom:4px;">Admin only</div>
+        <div class="text-muted text-sm" style="margin-bottom:16px;">Enter your PIN to view pending actions.</div>
+        <div style="display:flex;gap:8px;justify-content:center;align-items:center;">
+          <input id="dash-pin-input" type="password" inputmode="numeric" maxlength="4"
+            placeholder="PIN"
+            style="width:90px;padding:10px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:1.1rem;text-align:center;outline:none;letter-spacing:.2em;"
+            onkeydown="if(event.key==='Enter'){document.querySelector('[data-action=dash-unlock]').click();}" />
+          <button class="btn btn-primary" data-action="dash-unlock">Unlock</button>
+        </div>
+        <div id="dash-pin-error" style="color:var(--red);font-size:.8rem;margin-top:8px;min-height:18px;"></div>
+      </div>`;
+  }
+
   async function loadDashboard() {
     const el = document.getElementById('dashboard');
     if (!el) return;
