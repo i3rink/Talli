@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <meta name="theme-color" content="#0075ab" />
+  <meta name="theme-color" content="#0075ab" id="theme-color-meta" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
@@ -24,7 +24,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
-    /* ── Version: 2.2.0 ── */
+    /* ── Version: 2.3.0 ── */
 
     :root {
       --teal:        #0075ab;
@@ -55,7 +55,6 @@
       line-height: 1.5;
     }
 
-    /* dot-grid background */
     body::before {
       content: '';
       position: fixed;
@@ -89,22 +88,9 @@
       display: flex;
       align-items: center;
     }
-    .header-logo-svg {
-      width: 160px;
-      height: auto;
-      display: block;
-    }
-    .header-divider {
-      width: 1px;
-      height: 36px;
-      background: var(--border);
-      flex-shrink: 0;
-    }
-    .header-text span {
-      font-size: .8rem;
-      color: var(--muted);
-      white-space: nowrap;
-    }
+    .header-logo-svg { width: 160px; height: auto; display: block; }
+    .header-divider { width: 1px; height: 36px; background: var(--border); flex-shrink: 0; }
+    .header-text span { font-size: .8rem; color: var(--muted); white-space: nowrap; }
 
     /* ── Cards ── */
     .card {
@@ -133,26 +119,13 @@
       text-align: center;
       transition: border-color .2s, background .2s;
       cursor: pointer;
-      position: relative;
     }
-    .upload-zone.drag-over {
-      border-color: var(--teal);
-      background: var(--teal-faint);
-    }
-    .upload-zone p {
-      color: var(--muted);
-      font-size: .9rem;
-      margin-bottom: 14px;
-    }
-    .upload-zone p strong {
-      display: block;
-      color: var(--text);
-      font-size: 1rem;
-      margin-bottom: 4px;
-    }
+    .upload-zone.drag-over { border-color: var(--teal); background: var(--teal-faint); }
+    .upload-zone p { color: var(--muted); font-size: .9rem; margin-bottom: 14px; }
+    .upload-zone p strong { display: block; color: var(--text); font-size: 1rem; margin-bottom: 4px; }
     #file-input { display: none; }
 
-    /* ── Button styles ── */
+    /* ── Buttons ── */
     .btn {
       display: inline-flex;
       align-items: center;
@@ -170,88 +143,29 @@
     }
     .btn:active { transform: scale(.97); }
     .btn:disabled { opacity: .5; cursor: not-allowed; }
-
-    .btn-primary {
-      background: var(--teal);
-      color: #fff;
-    }
+    .btn-primary { background: var(--teal); color: #fff; }
     .btn-primary:hover:not(:disabled) { background: var(--teal-dark); }
-
-    .btn-outline {
-      background: transparent;
-      color: var(--teal);
-      border: 1.5px solid var(--teal);
-    }
+    .btn-outline { background: transparent; color: var(--teal); border: 1.5px solid var(--teal); }
     .btn-outline:hover:not(:disabled) { background: var(--teal-faint); }
-
-    .btn-ghost {
-      background: var(--bg);
-      color: var(--muted);
-      border: 1px solid var(--border);
-    }
+    .btn-ghost { background: var(--bg); color: var(--muted); border: 1px solid var(--border); }
     .btn-ghost:hover:not(:disabled) { background: var(--border); color: var(--text); }
+    .btn-danger { background: var(--red); color: #fff; }
 
-    .btn-danger {
-      background: var(--red);
-      color: #fff;
-    }
+    .upload-btns { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 4px; }
 
-    /* upload button row */
-    .upload-btns {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-      justify-content: center;
-      margin-top: 4px;
-    }
-
-    /* ── Google Drive button ── */
-    .btn-drive {
-      background: #fff;
-      color: #3c4043;
-      border: 1.5px solid #dadce0;
-      font-weight: 600;
-    }
+    .btn-drive { background: #fff; color: #3c4043; border: 1.5px solid #dadce0; font-weight: 600; }
     .btn-drive:hover:not(:disabled) { background: #f8f9fa; border-color: #4285f4; }
     .btn-drive svg { flex-shrink: 0; }
 
-    /* ── Drive auth status badge ── */
-    .drive-status {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      font-size: .78rem;
-      color: var(--muted);
-      margin-top: 10px;
-      justify-content: center;
-    }
-    .drive-status .dot {
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--border);
-      flex-shrink: 0;
-    }
+    .drive-status { display: flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--muted); margin-top: 10px; justify-content: center; }
+    .drive-status .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
     .drive-status.authed .dot { background: var(--green); }
     .drive-status.authed { color: var(--green); }
 
-    /* ── Session block ── */
-    .session-row {
-      display: flex;
-      gap: 10px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .session-code {
-      font-family: 'Bricolage Grotesque', sans-serif;
-      font-size: 1.6rem;
-      font-weight: 700;
-      color: var(--teal);
-      letter-spacing: .08em;
-      flex: 1;
-    }
+    .session-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .session-code { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.6rem; font-weight: 700; color: var(--teal); letter-spacing: .08em; flex: 1; }
 
-    /* ── Item list ── */
+    /* ── Item rows ── */
     .item-list { display: flex; flex-direction: column; gap: 6px; }
     .item-row {
       display: flex;
@@ -265,136 +179,59 @@
     }
     .item-name { flex: 1; font-weight: 500; }
     .item-qty { color: var(--muted); font-size: .8rem; white-space: nowrap; }
-    .item-status {
-      display: flex;
-      gap: 6px;
-      flex-shrink: 0;
-    }
+    .item-status { display: flex; gap: 6px; flex-shrink: 0; }
     .status-btn {
-      width: 32px;
-      height: 32px;
+      width: 32px; height: 32px;
       border-radius: 6px;
       border: 1.5px solid var(--border);
       background: transparent;
       cursor: pointer;
       font-size: 1rem;
-      display: flex;
-      align-items: center;
-      justify-content: center;
+      display: flex; align-items: center; justify-content: center;
       transition: background .12s, border-color .12s;
     }
-    .status-btn.active-green  { background: #d1fae5; border-color: var(--green); }
-    .status-btn.active-amber  { background: #fef3c7; border-color: var(--amber); }
-    .status-btn.active-red    { background: #fee2e2; border-color: var(--red); }
+    .status-btn.active-green { background: #d1fae5; border-color: var(--green); }
+    .status-btn.active-amber { background: #fef3c7; border-color: var(--amber); }
+    .status-btn.active-red   { background: #fee2e2; border-color: var(--red); }
 
-    .item-row.status-in   { background: #f0fdf4; border-color: #bbf7d0; }
-    .item-row.status-part { background: #fffbeb; border-color: #fde68a; }
-    .item-row.status-short{ background: #fef2f2; border-color: #fecaca; }
+    .item-row.status-in    { background: #f0fdf4; border-color: #bbf7d0; }
+    .item-row.status-part  { background: #fffbeb; border-color: #fde68a; }
+    .item-row.status-short { background: #fef2f2; border-color: #fecaca; }
 
     .qty-input {
-      width: 64px;
-      padding: 4px 8px;
-      border: 1.5px solid var(--amber);
-      border-radius: 6px;
-      font-family: 'Hanken Grotesk', sans-serif;
-      font-size: .85rem;
-      text-align: center;
-      outline: none;
+      width: 64px; padding: 4px 8px;
+      border: 1.5px solid var(--amber); border-radius: 6px;
+      font-family: 'Hanken Grotesk', sans-serif; font-size: .85rem;
+      text-align: center; outline: none;
     }
     .qty-input:focus { border-color: var(--teal); }
 
-    /* ── Tags ── */
-    .job-tag {
-      display: inline-block;
-      padding: 2px 8px;
-      border-radius: 20px;
-      font-size: .75rem;
-      font-weight: 600;
-      background: var(--teal-light);
-      color: var(--teal-dark);
-      margin-right: 4px;
-      margin-bottom: 2px;
-    }
+    .job-tag { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: .75rem; font-weight: 600; background: var(--teal-light); color: var(--teal-dark); margin-right: 4px; margin-bottom: 2px; }
 
-    /* ── Toast ── */
     #toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
+      position: fixed; bottom: 24px; left: 50%;
       transform: translateX(-50%) translateY(80px);
-      background: var(--text);
-      color: #fff;
-      padding: 10px 20px;
-      border-radius: 99px;
-      font-size: .85rem;
-      font-weight: 500;
-      z-index: 999;
-      transition: transform .25s ease;
-      white-space: nowrap;
-      pointer-events: none;
+      background: var(--text); color: #fff;
+      padding: 10px 20px; border-radius: 99px;
+      font-size: .85rem; font-weight: 500;
+      z-index: 999; transition: transform .25s ease;
+      white-space: nowrap; pointer-events: none;
     }
     #toast.show { transform: translateX(-50%) translateY(0); }
 
-    /* ── Shortfall table ── */
-    .shortfall-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: .85rem;
-    }
-    .shortfall-table th {
-      text-align: left;
-      padding: 6px 8px;
-      color: var(--muted);
-      font-weight: 600;
-      font-size: .78rem;
-      text-transform: uppercase;
-      letter-spacing: .05em;
-      border-bottom: 1px solid var(--border);
-    }
-    .shortfall-table td {
-      padding: 8px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: top;
-    }
+    .shortfall-table { width: 100%; border-collapse: collapse; font-size: .85rem; }
+    .shortfall-table th { text-align: left; padding: 6px 8px; color: var(--muted); font-weight: 600; font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); }
+    .shortfall-table td { padding: 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
     .shortfall-table tr:last-child td { border-bottom: none; }
     .need { color: var(--red); font-weight: 600; }
 
-    /* ── Tabs ── */
     .tabs { display: flex; gap: 4px; margin-bottom: 16px; flex-wrap: wrap; }
-    .tab-btn {
-      padding: 7px 16px;
-      border-radius: 99px;
-      border: 1.5px solid var(--border);
-      background: transparent;
-      font-family: 'Hanken Grotesk', sans-serif;
-      font-size: .85rem;
-      font-weight: 600;
-      color: var(--muted);
-      cursor: pointer;
-      transition: all .15s;
-    }
-    .tab-btn.active {
-      background: var(--teal);
-      border-color: var(--teal);
-      color: #fff;
-    }
+    .tab-btn { padding: 7px 16px; border-radius: 99px; border: 1.5px solid var(--border); background: transparent; font-family: 'Hanken Grotesk', sans-serif; font-size: .85rem; font-weight: 600; color: var(--muted); cursor: pointer; transition: all .15s; }
+    .tab-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
 
-    /* ── Progress bar ── */
-    .progress-bar-wrap {
-      background: var(--border);
-      border-radius: 99px;
-      height: 6px;
-      margin-bottom: 14px;
-      overflow: hidden;
-    }
-    .progress-bar-fill {
-      height: 100%;
-      background: var(--teal);
-      border-radius: 99px;
-      transition: width .3s ease;
-    }
+    .progress-bar-wrap { background: var(--border); border-radius: 99px; height: 6px; margin-bottom: 14px; overflow: hidden; }
+    .progress-bar-fill { height: 100%; background: var(--teal); border-radius: 99px; transition: width .3s ease; }
 
-    /* ── Misc ── */
     .text-muted { color: var(--muted); }
     .text-sm { font-size: .82rem; }
     .mt-2 { margin-top: 8px; }
@@ -406,31 +243,84 @@
     .justify-between { justify-content: space-between; }
     .w-full { width: 100%; }
 
-    .empty-state {
-      text-align: center;
-      padding: 32px 20px;
-      color: var(--muted);
-    }
+    .empty-state { text-align: center; padding: 32px 20px; color: var(--muted); }
     .empty-state .icon { font-size: 2.5rem; margin-bottom: 10px; }
 
-    /* ── Loading spinner ── */
-    .spinner {
-      display: inline-block;
-      width: 18px;
-      height: 18px;
-      border: 2.5px solid rgba(255,255,255,.4);
-      border-top-color: #fff;
-      border-radius: 50%;
-      animation: spin .7s linear infinite;
-      vertical-align: middle;
-    }
+    .spinner { display: inline-block; width: 18px; height: 18px; border: 2.5px solid rgba(255,255,255,.4); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Home launchpad ── */
+    .lp-intro { margin-bottom: 20px; }
+    .lp-intro h1 { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.4rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
+
+    .lp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+    .lp-card {
+      position: relative;
+      display: flex; flex-direction: column; gap: 6px;
+      padding: 20px 18px 18px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      border-top-width: 3px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      text-align: left;
+      transition: transform .12s, box-shadow .15s;
+      font-family: 'Hanken Grotesk', sans-serif;
+    }
+    .lp-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-lg); }
+    .lp-card:active { transform: scale(.98); }
+    .lp-card.c-blue   { border-top-color: #0075ab; }
+    .lp-card.c-green  { border-top-color: #059669; }
+    .lp-card.c-orange { border-top-color: #ea580c; }
+    .lp-card.c-purple { border-top-color: #7c3aed; opacity: .85; }
+
+    .lp-num { font-family: 'Bricolage Grotesque', sans-serif; font-size: .72rem; font-weight: 700; letter-spacing: .1em; }
+    .lp-card.c-blue   .lp-num { color: #0075ab; }
+    .lp-card.c-green  .lp-num { color: #059669; }
+    .lp-card.c-orange .lp-num { color: #ea580c; }
+    .lp-card.c-purple .lp-num { color: #7c3aed; }
+
+    .lp-name { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1rem; font-weight: 700; color: var(--text); line-height: 1.2; }
+    .lp-desc { font-size: .78rem; color: var(--muted); line-height: 1.4; }
+    .lp-glyph { font-size: 1.6rem; position: absolute; top: 14px; right: 16px; opacity: .12; line-height: 1; }
+
+    .lp-badge { display: inline-block; font-size: .65rem; font-weight: 700; background: #ede9fe; color: #7c3aed; border-radius: 20px; padding: 2px 8px; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 2px; }
+
+    /* ── Module 4 category grid ── */
+    .c4-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 8px; }
+    .c4-cat {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
+      padding: 14px 10px; text-align: center;
+    }
+    .c4-cat-icon { font-size: 1.4rem; margin-bottom: 6px; opacity: .25; }
+    .c4-cat-name { font-family: 'Bricolage Grotesque', sans-serif; font-size: .8rem; font-weight: 700; color: var(--text); }
+    .c4-cat-freq { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+    .c4-cat-count { font-size: .7rem; color: var(--muted); margin-top: 4px; background: var(--border); border-radius: 20px; display: inline-block; padding: 1px 8px; }
+
+    /* ── Coming-soon banner ── */
+    .cs-banner {
+      background: #faf5ff; border: 1px solid #c4b5fd; border-radius: 8px;
+      padding: 14px 16px; margin-bottom: 18px;
+    }
+    .cs-banner-title { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: .9rem; color: #5b21b6; margin-bottom: 4px; }
+    .cs-banner-body { font-size: .84rem; color: #6d28d9; line-height: 1.5; }
+
+    /* ── Module nav row ── */
+    .mod-back { margin-bottom: 14px; }
+
+    /* ── Pick row indicator ── */
+    .pick-indicator { font-weight: 700; font-size: 1rem; flex-shrink: 0; width: 20px; text-align: center; }
 
     @media (max-width: 520px) {
       .item-row { flex-wrap: wrap; }
       .session-code { font-size: 1.3rem; }
       .header-logo-wrap { width: 120px; }
       .header-logo-svg { width: 120px; }
+      .lp-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+      .lp-name { font-size: .9rem; }
+      .lp-desc { display: none; }
+      .c4-grid { grid-template-columns: repeat(2, 1fr); }
     }
   </style>
 </head>
@@ -440,46 +330,65 @@
   <!-- Header -->
   <div class="header">
     <div class="header-logo-wrap">
-      <!-- NOTE: the full inlined Annick Group wordmark SVG lives here in the live file.
-           Trimmed in this reference copy for readability. Pull the exact <svg> block
-           from the deployed index.html (or annick-logo.svg) when integrating. -->
-      <img class="header-logo-svg" src="annick-logo.svg" alt="Annick Group" />
+      <svg class="header-logo-svg" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 1000 1000">
+  <g isolation="isolate">
+    <g id="Layer_1" data-name="Layer 1">
+      <g>
+        <path d="M958.391,533.596c.053,39.767-30.949,76.713-70.897,80.374-42.501,5.129-81.863-28.434-86.527-71.117-2.801-18.236,3.07-34.655,12.712-49.648,11.988-19.008,26.717-36.15,39.242-56.384,6.781-10.856,13.108-22.715,18.156-35.847,2.138-4.87,3.765-11.729,7.401-15.168,3.074-1.785,5.067,5.034,6.402,7.826,11.28,31.148,33.966,58.968,51.341,84.638,12.315,18.882,22.005,34.297,22.169,55.127v.199Z" fill="#588dbf"/>
+        <path d="M828.575,487.816c3.465-2.293-14.01,21.011-6.584,47.76,2.981,10.737,9.466,18.809,15.621,24.583-4.761,6.365-8.92,12.731-13.68,19.096-7.129-7.449-17.123-26.831-15.107-50.264,2.384-27.705,18.097-40.081,19.75-41.175Z" fill="#fff"/>
+        <rect x="834.745" y="568.483" width="20.1" height="23.097" transform="translate(501.35 -385.453) rotate(35.945)" fill="#fff"/>
+      </g>
+      <g>
+        <g>
+          <path d="M154.439,551.291l-11.243-31.335h-48.317l-11.243,31.335h-31.813l55.494-148.302h23.441l55.494,148.302h-31.813ZM134.825,494.602l-15.787-48.079-15.787,48.079h31.574Z" fill="#588dbf"/>
+          <path d="M221.894,551.291h-29.661v-148.302h29.9l48.796,100.702v-100.702h29.421v148.302h-32.053l-46.404-91.373v91.373Z" fill="#588dbf"/>
+          <path d="M352.975,551.291h-29.661v-148.302h29.9l48.796,100.702v-100.702h29.421v148.302h-32.052l-46.404-91.373v91.373Z" fill="#588dbf"/>
+          <path d="M454.395,402.989h33.727v148.302h-33.727v-148.302Z" fill="#588dbf"/>
+          <path d="M610.113,548.899c-16.026,2.87-28.464,4.783-44.969,4.783-46.644,0-60.517-35.161-60.517-76.542s13.873-76.543,60.756-76.543c16.983,0,28.703,1.914,44.251,8.611l-9.807,23.202c-11.96-5.023-19.854-6.697-33.009-6.697-22.246,0-26.312,32.77-26.312,51.427,0,19.614,3.827,51.427,26.073,51.427,14.112,0,23.68-1.675,37.314-4.545l6.219,24.877Z" fill="#588dbf"/>
+          <path d="M655.803,402.989v67.692c19.136-14.591,34.444-41.142,43.056-67.692h36.119c-18.897,47.839-29.9,52.145-46.404,69.845l52.862,78.457h-40.902l-44.97-73.673v73.673h-33.727c0-49.514.239-98.788.239-148.302h33.727Z" fill="#588dbf"/>
+        </g>
+        <g>
+          <path d="M396.807,597.197c2.491.499,4.373,1.895,5.644,4.186,1.271,2.293,1.906,4.784,1.906,7.476,0,3.737-1.047,6.777-3.14,9.119-2.093,2.344-4.76,3.514-7.999,3.514h-20.257c0-5.93.012-13.966.037-24.107.025-10.141.038-17.529.038-22.163h18.015c3.188,0,5.78,1.222,7.774,3.662,1.993,2.442,2.99,5.283,2.99,8.521,0,2.144-.437,4.125-1.308,5.943-.873,1.819-2.106,3.102-3.7,3.85ZM378.643,579.481v16.295h11.811c1.893,0,3.326-.871,4.298-2.616.972-1.743,1.458-3.662,1.458-5.756,0-2.042-.512-3.874-1.532-5.494-1.022-1.618-2.43-2.429-4.224-2.429h-11.811ZM392.471,599.813h-13.829v17.417h13.829c1.894,0,3.351-.834,4.373-2.504,1.021-1.669,1.533-3.626,1.533-5.868,0-2.093-.499-4.123-1.495-6.093-.998-1.968-2.467-2.952-4.411-2.952Z" fill="#0075ab"/>
+          <path d="M445.769,621.491h-5.382l-3.289-9.493h-19.958l-3.364,9.493h-5.307l16.146-46.346h5.158l15.997,46.346ZM418.559,607.737h17.118l-8.521-25.341-8.596,25.341Z" fill="#0075ab"/>
+          <path d="M446.292,575.221h31.545v4.261h-12.782v42.01h-5.606v-42.01h-13.156v-4.261Z" fill="#0075ab"/>
+          <path d="M516.107,575.221v46.271h-5.605v-22.351h-19.884v22.351h-5.606v-46.271h5.606v19.659h19.884v-19.659h5.605Z" fill="#0075ab"/>
+          <path d="M554.754,621.491l-12.259-18.464h-8.672v18.464h-5.606v-46.271h14.577c5.083,0,8.994.96,11.735,2.878,2.74,1.919,4.111,5.395,4.111,10.428,0,3.737-.811,6.865-2.429,9.381-1.62,2.517-4.149,4.05-7.588,4.598l12.782,18.986h-6.652ZM533.898,579.481v19.285h10.689c2.99,0,5.095-.921,6.316-2.766,1.221-1.843,1.831-4.435,1.831-7.774,0-5.83-2.741-8.745-8.223-8.745h-10.614Z" fill="#0075ab"/>
+          <path d="M568.246,607.326c-.673-2.766-1.009-5.768-1.009-9.008s.336-6.241,1.009-9.008c.673-2.766,1.719-5.294,3.14-7.587,1.42-2.292,3.388-4.086,5.905-5.382,2.516-1.296,5.469-1.943,8.857-1.943,3.339,0,6.267.661,8.783,1.98,2.517,1.321,4.473,3.128,5.868,5.42,1.395,2.292,2.43,4.81,3.103,7.55.673,2.741,1.009,5.73,1.009,8.97s-.336,6.23-1.009,8.97c-.673,2.741-1.708,5.259-3.103,7.55-1.396,2.293-3.339,4.101-5.83,5.42-2.493,1.32-5.433,1.98-8.821,1.98s-6.342-.647-8.857-1.943c-2.518-1.295-4.485-3.089-5.905-5.382-1.421-2.292-2.467-4.821-3.14-7.587ZM573.217,598.318c0,13.206,4.31,19.809,12.932,19.809,8.522,0,12.783-6.603,12.783-19.809,0-13.105-4.261-19.659-12.783-19.659-8.622,0-12.932,6.554-12.932,19.659Z" fill="#0075ab"/>
+          <path d="M613.396,607.326c-.673-2.766-1.009-5.768-1.009-9.008s.336-6.241,1.009-9.008c.673-2.766,1.719-5.294,3.14-7.587,1.42-2.292,3.388-4.086,5.905-5.382,2.516-1.296,5.469-1.943,8.857-1.943,3.339,0,6.267.661,8.783,1.98,2.517,1.321,4.473,3.128,5.868,5.42,1.395,2.292,2.43,4.81,3.103,7.55.673,2.741,1.009,5.73,1.009,8.97s-.336,6.23-1.009,8.97c-.673,2.741-1.708,5.259-3.103,7.55-1.396,2.293-3.339,4.101-5.83,5.42-2.493,1.32-5.433,1.98-8.821,1.98s-6.342-.647-8.857-1.943c-2.518-1.295-4.485-3.089-5.905-5.382-1.421-2.292-2.467-4.821-3.14-7.587ZM618.366,598.318c0,13.206,4.31,19.809,12.932,19.809,8.522,0,12.783-6.603,12.783-19.809,0-13.105-4.261-19.659-12.783-19.659-8.622,0-12.932,6.554-12.932,19.659Z" fill="#0075ab"/>
+          <path d="M665.235,584.639l.224,36.853h-5.606v-46.271h6.056l15.249,38.048,14.875-38.048h6.354v46.271h-5.383v-36.853l-13.829,36.853h-3.961c-2.941-7.574-7.601-19.858-13.979-36.853Z" fill="#0075ab"/>
+          <path d="M739.312,576.641l-1.495,3.737c-2.99-1.096-6.329-1.645-10.017-1.645-2.592,0-4.784.536-6.578,1.607-1.794,1.072-2.691,2.803-2.691,5.195,0,1.596.561,3.053,1.683,4.373,1.121,1.32,2.516,2.417,4.186,3.289,1.669.872,3.487,1.868,5.457,2.989,1.968,1.122,3.786,2.243,5.457,3.364,1.669,1.121,3.064,2.604,4.186,4.447,1.121,1.845,1.682,3.913,1.682,6.205,0,3.987-1.494,6.989-4.484,9.007-2.99,2.019-6.903,3.027-11.736,3.027-3.24,0-7.8-.672-13.68-2.018l.897-3.888c5.033,1.097,9.045,1.645,12.035,1.645,7.275,0,10.913-2.541,10.913-7.624,0-1.693-.561-3.239-1.682-4.635-1.121-1.395-2.517-2.542-4.186-3.438-1.671-.897-3.489-1.906-5.457-3.027-1.97-1.121-3.788-2.205-5.457-3.252-1.67-1.047-3.064-2.441-4.187-4.186-1.121-1.744-1.682-3.688-1.682-5.831,0-3.786,1.383-6.664,4.148-8.634,2.767-1.968,6.117-2.952,10.055-2.952,4.584,0,8.795.747,12.633,2.242Z" fill="#0075ab"/>
+        </g>
+        <path d="M52.718,595.205c-.419-1.217,14.481-8.163,24.02-11.18,33.644-10.64,56.375,9.962,114.608,29.234,44.307,14.663,84.162,27.275,123.935,12.134,17.396-6.623,33.385-18.025,33.8-17.334.465.773-18.293,17.036-40.734,26-57.578,23.001-125.089-7.757-140.402-14.734-35.463-16.157-52.542-30.334-86.668-30.334-12.525,0-28.136,7.444-28.56,6.213Z" fill="#0aa0d7"/>
+        <path d="M213.013,602.859c11.339,4.75,54.75,21.348,101.401,2.6,18.652-7.495,32.053-18.323,40.734-26.867-2.869,7.034-8.437,17.867-19.146,27.176-22.601,19.647-51.264,17.871-64.922,17.025-27.142-1.682-47.348-12.793-58.068-19.934Z" fill="#588dbf"/>
+        <path d="M52.71,607.788c7.775-3.694,18.164-7.292,30.55-7.8,41.978-1.72,75.342,33.358,74.426,34.775-.671,1.039-19.557-16.337-53.626-24.213-20.483-4.735-38.516-4.201-51.351-2.763Z" fill="#0075ab"/>
+      </g>
+    </g>
+  </g>
+</svg>
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span>Stock Check &mdash; v2.2.1</span>
+      <span id="header-sub">Stock Check &mdash; v2.3.0</span>
     </div>
   </div>
 
   <div id="root"></div>
-
 </div>
 
 <div id="toast"></div>
 
 <script>
 'use strict';
-/* ════════════════════════════════════════════════════════════════════
-   Annick Stock Check — Pick Verifier
-   Version: 2.2.1
-   Change from 2.2.0: restored the SKU-aware packing-slip parser from the
-   Friday (v2.0.1) build. PDF text is rebuilt into proper lines, the SKU on
-   the line beneath each item is captured, bundles (KIT2S/KIT1E) expand into
-   parts, and the Mull/Bute catalogue row is skipped. SKU now shows on every
-   stock-check row and in the purchasing report. Google Drive picker, real-time
-   sync, session flow and header are unchanged from 2.2.0.
-
-   ════════════════════════════════════════════════════════════════════ */
 (function () {
 
   /* ═══════════════════════════════════════════════
      CONFIG
   ═══════════════════════════════════════════════ */
-  const SUPABASE_URL    = 'https://jlqonolsenwyipgqgmfr.supabase.co';
-  const SUPABASE_ANON   = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpscW9ub2xzZW53eWlwZ3FnbWZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NzE1NTgsImV4cCI6MjA5NjI0NzU1OH0.dJC8G4UO9o2-oS42Hdb9GCGn_1RsoXB1fsrVODShoo0';
-  const GOOGLE_API_KEY    = 'AIzaSyC1xZlmMOBxQlviDK_FgO0LMy1yXpR4vvo';
-  const GOOGLE_CLIENT_ID  = '26423864329-ppbhqq86bca9juj6ro4bh0oh2m6nv8b7.apps.googleusercontent.com';
-  const GOOGLE_APP_ID     = '26423864329';
+  const SUPABASE_URL   = 'https://jlqonolsenwyipgqgmfr.supabase.co';
+  const SUPABASE_ANON  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpscW9ub2xzZW53eWlwZ3FnbWZyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA2NzE1NTgsImV4cCI6MjA5NjI0NzU1OH0.dJC8G4UO9o2-oS42Hdb9GCGn_1RsoXB1fsrVODShoo0';
+  const GOOGLE_API_KEY   = 'AIzaSyC1xZlmMOBxQlviDK_FgO0LMy1yXpR4vvo';
+  const GOOGLE_CLIENT_ID = '26423864329-ppbhqq86bca9juj6ro4bh0oh2m6nv8b7.apps.googleusercontent.com';
+  const GOOGLE_APP_ID    = '26423864329';
 
   /* ═══════════════════════════════════════════════
      SUPABASE
@@ -487,34 +396,71 @@
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
   /* ═══════════════════════════════════════════════
+     MODULE THEMING
+  ═══════════════════════════════════════════════ */
+  const THEMES = {
+    home:       { main: '#0075ab', dark: '#005f8a', light: '#cce8f4', faint: '#f0f8fd' },
+    verifier:   { main: '#0075ab', dark: '#005f8a', light: '#cce8f4', faint: '#f0f8fd' },
+    completion: { main: '#059669', dark: '#047857', light: '#d1fae5', faint: '#f0fdf4' },
+    delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
+    stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
+  };
+  const MODULE_LABELS = {
+    home: 'Stock Check \u2014 v2.3.0',
+    verifier: 'Pick Verifier',
+    completion: 'Pick Completion',
+    delivery: 'Driver Delivery',
+    stock: 'Stock Checker',
+  };
+
+  function applyTheme(mod) {
+    const t = THEMES[mod] || THEMES.home;
+    const r = document.documentElement;
+    r.style.setProperty('--teal',       t.main);
+    r.style.setProperty('--teal-dark',  t.dark);
+    r.style.setProperty('--teal-light', t.light);
+    r.style.setProperty('--teal-faint', t.faint);
+    const sub = document.getElementById('header-sub');
+    if (sub) sub.textContent = MODULE_LABELS[mod] || 'Stock Check';
+    const meta = document.getElementById('theme-color-meta');
+    if (meta) meta.content = t.main;
+  }
+
+  /* ═══════════════════════════════════════════════
      STATE
   ═══════════════════════════════════════════════ */
   let state = {
-    view: 'upload',
+    /* global */
+    view:   'home',
+    module: 'home',
+    /* module 1 — pick verifier (unchanged) */
     session: null,
-    checks: {},
-    role: 'office',
-    tab: 'all',
-    driveAuthed: false,
-    driveToken: null,
+    checks:  {},
+    role:    'office',
+    tab:     'all',
+    driveAuthed:     false,
+    driveToken:      null,
     pickerApiLoaded: false,
-    pickerInitted: false,
+    /* module 2 — pick completion */
+    c2: { session: null, selectedJob: null, picks: {}, loading: false },
+    /* module 3 — driver delivery */
+    c3: { jobRef: '', items: [], delivered: {}, driverName: '', loading: false, session: null },
+    /* module 4 — stock checker */
+    c4: { screen: 'overview' },
   };
 
   /* ═══════════════════════════════════════════════
-     PDF.js setup
+     PDF.js
   ═══════════════════════════════════════════════ */
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-  /* ═══════════════════════════════════════════════
-     SKU pill styling (injected so no separate CSS edit is needed)
-  ═══════════════════════════════════════════════ */
-  (function injectStyle() {
+  /* ── SKU pill style (injected once) ── */
+  (function () {
     const s = document.createElement('style');
     s.textContent =
       '.item-sku{font-family:monospace;background:var(--bg);border:1px solid var(--border);' +
-      'border-radius:4px;padding:1px 6px;font-size:11px;margin-left:8px;color:var(--text-muted);white-space:nowrap}' +
+      'border-radius:4px;padding:1px 6px;font-size:11px;margin-left:8px;color:var(--muted);white-space:nowrap}' +
       '.report-sku{font-family:monospace;font-size:12px;color:var(--muted)}';
     document.head.appendChild(s);
   })();
@@ -523,49 +469,98 @@
      TOAST
   ═══════════════════════════════════════════════ */
   let toastTimer;
-  function toast(msg, duration = 2800) {
+  function toast(msg, dur = 2800) {
     const el = document.getElementById('toast');
     el.textContent = msg;
     el.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+    toastTimer = setTimeout(() => el.classList.remove('show'), dur);
   }
 
   /* ═══════════════════════════════════════════════
-     RENDER
+     RENDER DISPATCH
   ═══════════════════════════════════════════════ */
   function render() {
+    applyTheme(state.module);
     const root = document.getElementById('root');
-    if (state.view === 'upload')  root.innerHTML = renderUpload();
-    if (state.view === 'session') root.innerHTML = renderSession();
-    if (state.view === 'check')   root.innerHTML = renderCheck();
-    if (state.view === 'report')  root.innerHTML = renderReport();
+    const v = state.view;
+    /* home */
+    if (v === 'home')       { root.innerHTML = renderHome(); }
+    /* module 1 */
+    else if (v === 'upload')   { root.innerHTML = renderUpload(); }
+    else if (v === 'session')  { root.innerHTML = renderSession(); }
+    else if (v === 'check')    { root.innerHTML = renderCheck(); }
+    else if (v === 'report')   { root.innerHTML = renderReport(); }
+    /* module 2 */
+    else if (v === 'c2-home')  { root.innerHTML = renderC2Home(); }
+    else if (v === 'c2-jobs')  { root.innerHTML = renderC2Jobs(); }
+    else if (v === 'c2-pick')  { root.innerHTML = renderC2Pick(); }
+    else if (v === 'c2-done')  { root.innerHTML = renderC2Done(); }
+    /* module 3 */
+    else if (v === 'c3-home')  { root.innerHTML = renderC3Home(); }
+    else if (v === 'c3-check') { root.innerHTML = renderC3Check(); }
+    else if (v === 'c3-done')  { root.innerHTML = renderC3Done(); }
+    /* module 4 */
+    else if (v === 'c4-overview') { root.innerHTML = renderC4Overview(); }
     bindEvents();
   }
 
-  /* ───────────────────────────────────────────────
-     UPLOAD VIEW
-  ─────────────────────────────────────────────── */
+  /* ═══════════════════════════════════════════════
+     HOME VIEW
+  ═══════════════════════════════════════════════ */
+  function renderHome() {
+    const h = new Date().getHours();
+    const greet = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+    return `
+      <div class="lp-intro">
+        <h1>Good ${greet}.</h1>
+        <div class="text-muted text-sm">Pick a module to get started.</div>
+      </div>
+      <div class="lp-grid">
+        <button class="lp-card c-blue" data-action="open-module" data-mod="verifier">
+          <span class="lp-num">01</span>
+          <span class="lp-name">Pick Verifier</span>
+          <span class="lp-desc">Parse packing slips, build the pick list, check stock.</span>
+          <span class="lp-glyph">&#10003;</span>
+        </button>
+        <button class="lp-card c-green" data-action="open-module" data-mod="completion">
+          <span class="lp-num">02</span>
+          <span class="lp-name">Pick Completion</span>
+          <span class="lp-desc">Mark jobs as picked, flag shortfalls to purchasing.</span>
+          <span class="lp-glyph">&#9633;</span>
+        </button>
+        <button class="lp-card c-orange" data-action="open-module" data-mod="delivery">
+          <span class="lp-num">03</span>
+          <span class="lp-name">Driver Delivery</span>
+          <span class="lp-desc">Enter a job, tick off what landed on site.</span>
+          <span class="lp-glyph">&#9654;</span>
+        </button>
+        <button class="lp-card c-purple" data-action="open-module" data-mod="stock">
+          <span class="lp-badge">Coming soon</span>
+          <span class="lp-num">04</span>
+          <span class="lp-name">Stock Checker</span>
+          <span class="lp-desc">Physical counts by category, variance review, audit trail.</span>
+          <span class="lp-glyph">&#9632;</span>
+        </button>
+      </div>`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     MODULE 1 — PICK VERIFIER (unchanged from v2.2.1)
+  ═══════════════════════════════════════════════ */
   function renderUpload() {
     const driveStatusHtml = state.driveAuthed
       ? `<div class="drive-status authed"><span class="dot"></span>Connected to Google Drive</div>`
       : `<div class="drive-status"><span class="dot"></span>Not connected to Google Drive</div>`;
-
     return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
       <div class="card">
         <div class="card-title">New Stock Check Session</div>
         <div class="upload-zone" id="drop-zone">
-          <p>
-            <strong>Upload Packing Slips</strong>
-            Drag &amp; drop PDF files here, or use the buttons below
-          </p>
+          <p><strong>Upload Packing Slips</strong>Drag &amp; drop PDF files here, or use the buttons below</p>
           <div class="upload-btns">
-            <button class="btn btn-primary" data-action="browse-files">
-              📄 Choose Files
-            </button>
-            <button class="btn btn-drive" data-action="drive-pick">
-              ${driveIcon()} Upload from Google Drive
-            </button>
+            <button class="btn btn-primary" data-action="browse-files">&#128196; Choose Files</button>
+            <button class="btn btn-drive" data-action="drive-pick">${driveIcon()} Upload from Google Drive</button>
           </div>
           ${driveStatusHtml}
         </div>
@@ -573,18 +568,17 @@
         <div id="file-list" class="mt-4"></div>
         <div id="parse-progress" style="display:none" class="mt-4">
           <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
-          <p class="text-muted text-sm" id="progress-label">Parsing PDFs…</p>
+          <p class="text-muted text-sm" id="progress-label">Parsing PDFs&#8230;</p>
         </div>
       </div>
-      <div class="card" id="join-card">
+      <div class="card">
         <div class="card-title">Join a Session (Warehouse)</div>
         <div class="flex gap-2 flex-wrap items-center">
           <input id="join-code" type="text" placeholder="Enter session code e.g. AB-2506-1"
             style="flex:1;min-width:160px;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
-          <button class="btn btn-outline" data-action="join-session">Join →</button>
+          <button class="btn btn-outline" data-action="join-session">Join &#8594;</button>
         </div>
-      </div>
-    `;
+      </div>`;
   }
 
   function driveIcon() {
@@ -598,9 +592,6 @@
     </svg>`;
   }
 
-  /* ───────────────────────────────────────────────
-     SESSION VIEW
-  ─────────────────────────────────────────────── */
   function renderSession() {
     const s = state.session;
     return `
@@ -608,8 +599,8 @@
         <div class="card-title">Session Created</div>
         <div class="session-row">
           <div class="session-code">${s.code}</div>
-          <button class="btn btn-ghost" data-action="copy-code">📋 Copy Code</button>
-          <button class="btn btn-primary" data-action="go-check">Start Check →</button>
+          <button class="btn btn-ghost" data-action="copy-code">&#128203; Copy Code</button>
+          <button class="btn btn-primary" data-action="go-check">Start Check &#8594;</button>
         </div>
         <p class="text-muted text-sm mt-2">Share this code with the warehouse team to join on their phones.</p>
       </div>
@@ -618,13 +609,9 @@
         <div>${s.jobs.map(j => `<span class="job-tag">${esc(j)}</span>`).join('')}</div>
         <p class="text-muted text-sm mt-2">${s.masterList.length} line items consolidated</p>
       </div>
-      <button class="btn btn-ghost mt-2" data-action="back-upload">← Upload different files</button>
-    `;
+      <button class="btn btn-ghost mt-2" data-action="back-upload">&#8592; Upload different files</button>`;
   }
 
-  /* ───────────────────────────────────────────────
-     CHECK VIEW  (SKU + unit now shown on each row)
-  ─────────────────────────────────────────────── */
   function renderCheck() {
     const items = state.session.masterList;
     const checks = state.checks;
@@ -633,29 +620,24 @@
     const pct   = total ? Math.round((done / total) * 100) : 0;
 
     let filtered = items;
-    if (state.tab === 'short') filtered = items.filter(i => checks[i.key]?.status === 'short');
-    if (state.tab === 'in')    filtered = items.filter(i => checks[i.key]?.status === 'in');
+    if (state.tab === 'short')     filtered = items.filter(i => checks[i.key]?.status === 'short');
+    if (state.tab === 'in')        filtered = items.filter(i => checks[i.key]?.status === 'in');
     if (state.tab === 'remaining') filtered = items.filter(i => !checks[i.key]?.status);
 
     const rows = filtered.map(item => {
       const c = checks[item.key] || {};
       const st = c.status || '';
-      const skuHtml  = item.sku ? `<span class="item-sku">${esc(item.sku)}</span>` : '';
+      const skuHtml  = item.sku  ? `<span class="item-sku">${esc(item.sku)}</span>` : '';
       const unitHtml = item.unit ? ' ' + esc(item.unit) : '';
       return `
-        <div class="item-row ${st ? 'status-' + (st === 'in' ? 'in' : st === 'part' ? 'part' : 'short') : ''}"
-             data-key="${esc(item.key)}">
+        <div class="item-row ${st ? 'status-' + (st === 'in' ? 'in' : st === 'part' ? 'part' : 'short') : ''}" data-key="${esc(item.key)}">
           <div class="item-name">${esc(item.name)}${skuHtml}</div>
           <div class="item-qty">Qty: ${item.qty}${unitHtml}</div>
-          ${st === 'part' ? `<input class="qty-input" type="number" min="0" max="${item.qty}"
-            placeholder="Have?" value="${c.haveQty || ''}" data-action="qty-input" data-key="${esc(item.key)}" />` : ''}
+          ${st === 'part' ? `<input class="qty-input" type="number" min="0" max="${item.qty}" placeholder="Have?" value="${c.haveQty || ''}" data-action="qty-input" data-key="${esc(item.key)}" />` : ''}
           <div class="item-status">
-            <button class="status-btn ${st === 'in' ? 'active-green' : ''}"
-              data-action="set-status" data-key="${esc(item.key)}" data-status="in" title="In stock">✓</button>
-            <button class="status-btn ${st === 'part' ? 'active-amber' : ''}"
-              data-action="set-status" data-key="${esc(item.key)}" data-status="part" title="Partial">~</button>
-            <button class="status-btn ${st === 'short' ? 'active-red' : ''}"
-              data-action="set-status" data-key="${esc(item.key)}" data-status="short" title="Short">✗</button>
+            <button class="status-btn ${st === 'in'    ? 'active-green' : ''}" data-action="set-status" data-key="${esc(item.key)}" data-status="in"    title="In stock">&#10003;</button>
+            <button class="status-btn ${st === 'part'  ? 'active-amber' : ''}" data-action="set-status" data-key="${esc(item.key)}" data-status="part"  title="Partial">~</button>
+            <button class="status-btn ${st === 'short' ? 'active-red'   : ''}" data-action="set-status" data-key="${esc(item.key)}" data-status="short" title="Short">&#10007;</button>
           </div>
         </div>`;
     }).join('');
@@ -665,79 +647,297 @@
         <div class="flex justify-between items-center" style="margin-bottom:10px;">
           <div>
             <span class="card-title" style="margin-bottom:0;">Stock Check</span>
-            <div class="text-muted text-sm">${state.session.code} · ${done}/${total} checked</div>
+            <div class="text-muted text-sm">${state.session.code} &middot; ${done}/${total} checked</div>
           </div>
-          <button class="btn btn-primary" data-action="go-report">Report →</button>
+          <button class="btn btn-primary" data-action="go-report">Report &#8594;</button>
         </div>
         <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
         <div class="tabs">
-          <button class="tab-btn ${state.tab === 'all' ? 'active' : ''}" data-action="tab" data-tab="all">All (${total})</button>
+          <button class="tab-btn ${state.tab === 'all'       ? 'active' : ''}" data-action="tab" data-tab="all">All (${total})</button>
           <button class="tab-btn ${state.tab === 'remaining' ? 'active' : ''}" data-action="tab" data-tab="remaining">Remaining (${total - done})</button>
-          <button class="tab-btn ${state.tab === 'short' ? 'active' : ''}" data-action="tab" data-tab="short">Short (${Object.values(checks).filter(c=>c.status==='short'||c.status==='part').length})</button>
-          <button class="tab-btn ${state.tab === 'in' ? 'active' : ''}" data-action="tab" data-tab="in">In Stock (${Object.values(checks).filter(c=>c.status==='in').length})</button>
+          <button class="tab-btn ${state.tab === 'short'     ? 'active' : ''}" data-action="tab" data-tab="short">Short (${Object.values(checks).filter(c => c.status === 'short' || c.status === 'part').length})</button>
+          <button class="tab-btn ${state.tab === 'in'        ? 'active' : ''}" data-action="tab" data-tab="in">In Stock (${Object.values(checks).filter(c => c.status === 'in').length})</button>
         </div>
-        <div class="item-list">
-          ${rows || `<div class="empty-state"><div class="icon">✓</div><p>Nothing here</p></div>`}
-        </div>
-      </div>
-    `;
+        <div class="item-list">${rows || '<div class="empty-state"><div class="icon">&#10003;</div><p>Nothing here</p></div>'}</div>
+      </div>`;
   }
 
-  /* ───────────────────────────────────────────────
-     REPORT VIEW  (SKU column added)
-  ─────────────────────────────────────────────── */
   function renderReport() {
-    const items   = state.session.masterList;
-    const checks  = state.checks;
-    const shorts  = items.filter(i => {
-      const c = checks[i.key];
-      return c && (c.status === 'short' || c.status === 'part');
-    });
-
+    const items  = state.session.masterList;
+    const checks = state.checks;
+    const shorts = items.filter(i => { const c = checks[i.key]; return c && (c.status === 'short' || c.status === 'part'); });
     const rows = shorts.map(item => {
-      const c = checks[item.key];
+      const c    = checks[item.key];
       const have = c.status === 'part' ? (Number(c.haveQty) || 0) : 0;
       const need = item.qty - have;
-      return `<tr>
-        <td>${esc(item.name)}</td>
-        <td class="report-sku">${item.sku ? esc(item.sku) : '—'}</td>
-        <td>${item.qty}</td>
-        <td>${have}</td>
-        <td class="need">${need}</td>
-        <td>${item.jobs ? esc(item.jobs.join(', ')) : ''}</td>
-      </tr>`;
+      return `<tr><td>${esc(item.name)}</td><td class="report-sku">${item.sku ? esc(item.sku) : '&mdash;'}</td><td>${item.qty}</td><td>${have}</td><td class="need">${need}</td><td>${item.jobs ? esc(item.jobs.join(', ')) : ''}</td></tr>`;
     }).join('');
-
     return `
       <div class="card">
         <div class="flex justify-between items-center" style="margin-bottom:16px;">
           <div class="card-title" style="margin-bottom:0;">Purchasing Report</div>
-          <button class="btn btn-ghost" data-action="go-check">← Back</button>
+          <button class="btn btn-ghost" data-action="go-check">&#8592; Back</button>
         </div>
         ${shorts.length === 0
-          ? `<div class="empty-state"><div class="icon">🎉</div><p>All items in stock — nothing to order!</p></div>`
-          : `<table class="shortfall-table">
-              <thead><tr>
-                <th>Item</th><th>SKU</th><th>Needed</th><th>Have</th><th>To Order</th><th>Job(s)</th>
-              </tr></thead>
-              <tbody>${rows}</tbody>
-            </table>`
-        }
+          ? `<div class="empty-state"><div class="icon">&#127881;</div><p>All items in stock &mdash; nothing to order!</p></div>`
+          : `<table class="shortfall-table"><thead><tr><th>Item</th><th>SKU</th><th>Needed</th><th>Have</th><th>To Order</th><th>Job(s)</th></tr></thead><tbody>${rows}</tbody></table>`}
         <div class="flex gap-2 flex-wrap mt-4">
-          <button class="btn btn-primary" data-action="copy-report">📋 Copy Report</button>
-          <button class="btn btn-ghost" data-action="new-session">New Session</button>
+          <button class="btn btn-primary" data-action="copy-report">&#128203; Copy Report</button>
+          <button class="btn btn-ghost"   data-action="new-session">New Session</button>
+          <button class="btn btn-ghost"   data-action="go-home">&#8592; Home</button>
         </div>
-      </div>
-    `;
+      </div>`;
   }
 
   /* ═══════════════════════════════════════════════
-     EVENT BINDING
+     MODULE 2 — PICK COMPLETION
+  ═══════════════════════════════════════════════ */
+  function renderC2Home() {
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="card">
+        <div class="card-title">Pick Completion</div>
+        <p class="text-muted text-sm" style="margin-bottom:14px;">Enter the session code from Pick Verifier to load this week&#8217;s jobs.</p>
+        <div class="flex gap-2 flex-wrap items-center">
+          <input id="c2-code" type="text" placeholder="e.g. AB-2506-1" autocapitalize="characters"
+            style="flex:1;min-width:160px;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
+          <button class="btn btn-primary" data-action="c2-load">Load Session &#8594;</button>
+        </div>
+        ${state.c2.loading ? `<p class="text-muted text-sm mt-2">Loading&#8230;</p>` : ''}
+      </div>`;
+  }
+
+  function renderC2Jobs() {
+    const s    = state.c2.session;
+    const jobs = s.jobs || [];
+    const jobRows = jobs.map(jobRef => {
+      const items = s.masterList.filter(i => i.jobs && i.jobs.includes(jobRef));
+      const picks = state.c2.picks[jobRef] || {};
+      const entered = Object.values(picks).filter(p => p.qty !== null && p.qty !== undefined).length;
+      return `
+        <div class="item-row" style="cursor:pointer;" data-action="c2-select-job" data-job="${esc(jobRef)}">
+          <div class="item-name">${esc(jobRef)}</div>
+          <div class="item-qty">${items.length} item${items.length !== 1 ? 's' : ''}</div>
+          ${entered > 0 ? `<span class="job-tag">${entered} entered</span>` : ''}
+          <div style="color:var(--muted);font-size:1.2rem;flex-shrink:0;">&#8250;</div>
+        </div>`;
+    }).join('');
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="card">
+        <div class="card-title">Jobs &mdash; ${esc(s.code)}</div>
+        <p class="text-muted text-sm" style="margin-bottom:14px;">${jobs.length} job${jobs.length !== 1 ? 's' : ''} on this session. Select one to start picking.</p>
+        <div class="item-list">${jobRows}</div>
+      </div>`;
+  }
+
+  function renderC2Pick() {
+    const s      = state.c2.session;
+    const jobRef = state.c2.selectedJob;
+    const items  = s.masterList.filter(i => i.jobs && i.jobs.includes(jobRef));
+    const picks  = state.c2.picks[jobRef] || {};
+    const total  = items.length;
+    const entered = Object.values(picks).filter(p => p.qty !== null && p.qty !== undefined).length;
+    const pct    = total ? Math.round(entered / total * 100) : 0;
+
+    const rows = items.map(item => {
+      const p = picks[item.key];
+      const val = (p && p.qty !== undefined && p.qty !== null) ? p.qty : '';
+      const needed = item.qty;
+      let rowClass = '', indColor = '', indChar = '';
+      if (val !== '') {
+        const n = Number(val);
+        if (n >= needed)    { rowClass = 'status-in';    indColor = 'var(--green)'; indChar = '&#10003;'; }
+        else if (n > 0)     { rowClass = 'status-part';  indColor = 'var(--amber)'; indChar = '~'; }
+        else                { rowClass = 'status-short'; indColor = 'var(--red)';   indChar = '&#10007;'; }
+      }
+      return `
+        <div class="item-row ${rowClass}">
+          <div class="item-name">${esc(item.name)}${item.sku ? `<span class="item-sku">${esc(item.sku)}</span>` : ''}</div>
+          <div class="item-qty">Need: ${needed}${item.unit ? ' ' + esc(item.unit) : ''}</div>
+          <input class="qty-input" type="number" min="0" style="width:72px;"
+            placeholder="${needed}" value="${val}"
+            data-action="c2-qty" data-key="${esc(item.key)}" data-needed="${needed}" />
+          ${indChar ? `<div class="pick-indicator" style="color:${indColor};">${indChar}</div>` : '<div class="pick-indicator"></div>'}
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c2-back-jobs">&#8592; Jobs</button></div>
+      <div class="card">
+        <div class="flex justify-between items-center" style="margin-bottom:10px;">
+          <div>
+            <span class="card-title" style="margin-bottom:0;">Picking &mdash; ${esc(jobRef)}</span>
+            <div class="text-muted text-sm">${entered}/${total} entered &middot; blank = fully picked</div>
+          </div>
+          <button class="btn btn-primary" data-action="c2-submit">Submit &#8594;</button>
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+        <div class="item-list">${rows}</div>
+      </div>
+      <p class="text-muted text-sm" style="padding:0 4px;">Leave blank to record as fully picked. Only change the number if you picked less than needed.</p>`;
+  }
+
+  function renderC2Done() {
+    const s      = state.c2.session;
+    const jobRef = state.c2.selectedJob;
+    const picks  = state.c2.picks[jobRef] || {};
+    const items  = s.masterList.filter(i => i.jobs && i.jobs.includes(jobRef));
+    const shorts = items.filter(i => { const p = picks[i.key]; return p && p.qty !== null && Number(p.qty) < i.qty; });
+
+    const shortRows = shorts.map(item => {
+      const p    = picks[item.key];
+      const pQty = Number(p.qty);
+      return `<tr><td>${esc(item.name)}</td><td class="report-sku">${item.sku ? esc(item.sku) : '&mdash;'}</td><td>${item.qty}</td><td>${pQty}</td><td class="need">${item.qty - pQty}</td></tr>`;
+    }).join('');
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c2-back-jobs">&#8592; Jobs</button></div>
+      <div class="card">
+        <div class="card-title">Pick submitted &mdash; ${esc(jobRef)}</div>
+        ${shorts.length === 0
+          ? `<div class="empty-state"><div class="icon">&#127881;</div><p>Fully picked &mdash; nothing short.</p></div>`
+          : `<p class="text-muted text-sm" style="margin-bottom:12px;">${shorts.length} item${shorts.length !== 1 ? 's' : ''} short:</p>
+             <table class="shortfall-table"><thead><tr><th>Item</th><th>SKU</th><th>Needed</th><th>Picked</th><th>Short</th></tr></thead><tbody>${shortRows}</tbody></table>`}
+        <div class="flex gap-2 flex-wrap mt-4">
+          ${shorts.length > 0 ? `<button class="btn btn-primary" data-action="c2-copy-short">&#128203; Copy to Purchasing</button>` : ''}
+          <button class="btn btn-ghost" data-action="c2-back-jobs">Back to Jobs</button>
+          <button class="btn btn-ghost" data-action="go-home">&#8592; Home</button>
+        </div>
+      </div>`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     MODULE 3 — DRIVER DELIVERY
+  ═══════════════════════════════════════════════ */
+  function renderC3Home() {
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="card">
+        <div class="card-title">Driver Delivery</div>
+        <p class="text-muted text-sm" style="margin-bottom:16px;">Enter your job number to see what to deliver on site.</p>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <input id="c3-job" type="text" placeholder="Job ref e.g. Q1785 or 1785" autocapitalize="characters"
+            style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
+          <input id="c3-driver" type="text" placeholder="Your name (optional)"
+            style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" value="${esc(state.c3.driverName)}" />
+          <button class="btn btn-primary" data-action="c3-load" style="width:100%;">Find Job &#8594;</button>
+        </div>
+        ${state.c3.loading ? `<p class="text-muted text-sm mt-2">Looking up job&#8230;</p>` : ''}
+      </div>`;
+  }
+
+  function renderC3Check() {
+    const items     = state.c3.items;
+    const delivered = state.c3.delivered;
+    const total     = items.length;
+    const done      = Object.values(delivered).filter(d => d.status).length;
+    const pct       = total ? Math.round(done / total * 100) : 0;
+
+    const rows = items.map(item => {
+      const d  = delivered[item.key] || {};
+      const st = d.status || '';
+      const rowClass = st === 'delivered' ? 'status-in' : st === 'short' ? 'status-short' : '';
+      return `
+        <div class="item-row ${rowClass}">
+          <div class="item-name">${esc(item.name)}${item.sku ? `<span class="item-sku">${esc(item.sku)}</span>` : ''}</div>
+          <div class="item-qty">Qty: ${item.qty}${item.unit ? ' ' + esc(item.unit) : ''}</div>
+          ${st === 'short' ? `<input class="qty-input" type="number" min="0" max="${item.qty}"
+            placeholder="Qty?" value="${d.deliveredQty !== undefined ? d.deliveredQty : ''}"
+            data-action="c3-qty" data-key="${esc(item.key)}" />` : ''}
+          <div class="item-status">
+            <button class="status-btn ${st === 'delivered' ? 'active-green' : ''}"
+              data-action="c3-status" data-key="${esc(item.key)}" data-status="delivered" title="Delivered in full">&#10003;</button>
+            <button class="status-btn ${st === 'short' ? 'active-red' : ''}"
+              data-action="c3-status" data-key="${esc(item.key)}" data-status="short" title="Short / partial">&#10007;</button>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c3-back">&#8592; Back</button></div>
+      <div class="card">
+        <div class="flex justify-between items-center" style="margin-bottom:10px;">
+          <div>
+            <span class="card-title" style="margin-bottom:0;">Delivering &mdash; ${esc(state.c3.jobRef)}</span>
+            <div class="text-muted text-sm">${done}/${total} confirmed &middot; tick each item as it lands</div>
+          </div>
+          <button class="btn btn-primary" data-action="c3-submit" ${done < 1 ? 'disabled' : ''}>Submit &#8594;</button>
+        </div>
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" style="width:${pct}%"></div></div>
+        <div class="item-list">${rows || '<div class="empty-state"><p>No items loaded.</p></div>'}</div>
+      </div>`;
+  }
+
+  function renderC3Done() {
+    const items     = state.c3.items;
+    const delivered = state.c3.delivered;
+    const shorts    = items.filter(i => { const d = delivered[i.key]; return d && d.status === 'short'; });
+
+    const shortRows = shorts.map(item => {
+      const d      = delivered[item.key];
+      const delQty = d.deliveredQty !== undefined ? Number(d.deliveredQty) : 0;
+      return `<tr><td>${esc(item.name)}</td><td>${item.qty}</td><td>${delQty}</td><td class="need">${item.qty - delQty}</td></tr>`;
+    }).join('');
+
+    return `
+      <div class="card">
+        <div class="card-title">Delivery submitted &mdash; ${esc(state.c3.jobRef)}</div>
+        ${shorts.length === 0
+          ? `<div class="empty-state"><div class="icon">&#127881;</div><p>Full delivery &mdash; all items confirmed on site.</p></div>`
+          : `<p class="text-muted text-sm" style="margin-bottom:12px;">${shorts.length} item${shorts.length !== 1 ? 's' : ''} not fully delivered:</p>
+             <table class="shortfall-table"><thead><tr><th>Item</th><th>Expected</th><th>Delivered</th><th>Short</th></tr></thead><tbody>${shortRows}</tbody></table>`}
+        <div class="flex gap-2 flex-wrap mt-4">
+          <button class="btn btn-ghost" data-action="c3-another">Another Job</button>
+          <button class="btn btn-ghost" data-action="go-home">&#8592; Home</button>
+        </div>
+      </div>`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     MODULE 4 — STOCK CHECKER (scaffold)
+  ═══════════════════════════════════════════════ */
+  const C4_CATS = [
+    { key: 'wall_floor',  name: 'Wall & Floor',  icon: '&#9638;', freq: 'Monthly' },
+    { key: 'wet_areas',   name: 'Wet Areas',     icon: '&#9711;', freq: 'Fortnightly' },
+    { key: 'glassware',   name: 'Glassware',     icon: '&#9671;', freq: 'Monthly' },
+    { key: 'brassware',   name: 'Brassware',     icon: '&#9672;', freq: 'Fortnightly' },
+    { key: 'furniture',   name: 'Furniture',     icon: '&#9636;', freq: 'Monthly' },
+    { key: 'consumables', name: 'Consumables',   icon: '&#9637;', freq: 'Weekly' },
+  ];
+
+  function renderC4Overview() {
+    const catCards = C4_CATS.map(c => `
+      <div class="c4-cat">
+        <div class="c4-cat-icon">${c.icon}</div>
+        <div class="c4-cat-name">${esc(c.name)}</div>
+        <div class="c4-cat-freq">${c.freq}</div>
+        <div class="c4-cat-count">0 items</div>
+      </div>`).join('');
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="card">
+        <div class="card-title">Stock Checker</div>
+        <div class="cs-banner">
+          <div class="cs-banner-title">Coming soon</div>
+          <div class="cs-banner-body">Stock lists are being populated. This module will be ready once the category lists are set up. The structure below shows how it will work.</div>
+        </div>
+        <div class="c4-grid">${catCards}</div>
+        <div class="flex gap-2 flex-wrap mt-4">
+          <button class="btn btn-ghost" disabled>Start Count</button>
+          <button class="btn btn-ghost" disabled>Review Variances</button>
+          <button class="btn btn-ghost" disabled>Audit Trail</button>
+        </div>
+      </div>`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     EVENT BINDING (drag-and-drop for M1)
   ═══════════════════════════════════════════════ */
   function bindEvents() {
     const dz = document.getElementById('drop-zone');
     if (dz) {
-      dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+      dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('drag-over'); });
       dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
       dz.addEventListener('drop', e => {
         e.preventDefault();
@@ -747,39 +947,107 @@
     }
   }
 
+  /* ═══════════════════════════════════════════════
+     GLOBAL CLICK HANDLER
+  ═══════════════════════════════════════════════ */
   document.addEventListener('click', e => {
     const btn = e.target.closest('[data-action]');
     if (!btn) return;
     const action = btn.dataset.action;
-    if (action === 'browse-files') { document.getElementById('file-input').click(); }
-    if (action === 'drive-pick')   { handleDrivePick(); }
+
+    /* ── navigation ── */
+    if (action === 'open-module') {
+      const mod = btn.dataset.mod;
+      state.module = mod;
+      if (mod === 'verifier')   { state.view = 'upload'; }
+      if (mod === 'completion') { state.view = 'c2-home'; }
+      if (mod === 'delivery')   { state.view = 'c3-home'; }
+      if (mod === 'stock')      { state.view = 'c4-overview'; }
+      render(); return;
+    }
+    if (action === 'go-home') {
+      state.module = 'home'; state.view = 'home';
+      state.c2 = { session: null, selectedJob: null, picks: {}, loading: false };
+      state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null };
+      render(); return;
+    }
+
+    /* ── module 1 ── */
+    if (action === 'browse-files') { document.getElementById('file-input').click(); return; }
+    if (action === 'drive-pick')   { handleDrivePick(); return; }
     if (action === 'join-session') {
       const code = document.getElementById('join-code').value.trim().toUpperCase();
-      if (code) joinSession(code);
+      if (code) joinSession(code); return;
     }
-    if (action === 'copy-code') { navigator.clipboard.writeText(state.session.code).then(() => toast('Code copied!')); }
-    if (action === 'go-check')   { state.view = 'check';   render(); }
-    if (action === 'go-report')  { state.view = 'report';  render(); }
-    if (action === 'back-upload'){ state.view = 'upload';  render(); }
-    if (action === 'new-session'){ state.session = null; state.checks = {}; state.view = 'upload'; render(); }
-    if (action === 'tab')        { state.tab = btn.dataset.tab; render(); }
-    if (action === 'set-status') { setStatus(btn.dataset.key, btn.dataset.status); }
-    if (action === 'copy-report'){ copyReport(); }
-  });
+    if (action === 'copy-code')   { navigator.clipboard.writeText(state.session.code).then(() => toast('Code copied!')); return; }
+    if (action === 'go-check')    { state.view = 'check';  render(); return; }
+    if (action === 'go-report')   { state.view = 'report'; render(); return; }
+    if (action === 'back-upload') { state.view = 'upload'; render(); return; }
+    if (action === 'new-session') { state.session = null; state.checks = {}; state.view = 'upload'; render(); return; }
+    if (action === 'tab')         { state.tab = btn.dataset.tab; render(); return; }
+    if (action === 'set-status')  { setStatus(btn.dataset.key, btn.dataset.status); return; }
+    if (action === 'copy-report') { copyReport(); return; }
 
-  document.addEventListener('change', e => {
-    if (e.target.id === 'file-input') { handleFiles([...e.target.files]); }
-    if (e.target.dataset.action === 'qty-input') {
-      const key = e.target.dataset.key;
-      if (state.checks[key]) {
-        state.checks[key].haveQty = Number(e.target.value);
-        pushCheck(key);
-      }
+    /* ── module 2 ── */
+    if (action === 'c2-load')       { loadC2Session(); return; }
+    if (action === 'c2-select-job') { state.c2.selectedJob = btn.dataset.job; state.view = 'c2-pick'; render(); return; }
+    if (action === 'c2-back-jobs')  { state.view = 'c2-jobs'; render(); return; }
+    if (action === 'c2-submit')     { submitC2Picks(); return; }
+    if (action === 'c2-copy-short') { copyC2Shortfall(); return; }
+
+    /* ── module 3 ── */
+    if (action === 'c3-load') { loadC3Job(); return; }
+    if (action === 'c3-back') {
+      state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null };
+      state.view = 'c3-home'; render(); return;
+    }
+    if (action === 'c3-status') {
+      const key = btn.dataset.key; const status = btn.dataset.status;
+      if (state.c3.delivered[key]?.status === status) { delete state.c3.delivered[key]; }
+      else { state.c3.delivered[key] = { status, deliveredQty: state.c3.delivered[key]?.deliveredQty }; }
+      render(); return;
+    }
+    if (action === 'c3-submit')  { submitC3Delivery(); return; }
+    if (action === 'c3-another') {
+      state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null };
+      state.view = 'c3-home'; render(); return;
     }
   });
 
   /* ═══════════════════════════════════════════════
-     GOOGLE DRIVE PICKER  (unchanged from 2.2.0)
+     GLOBAL CHANGE HANDLER
+  ═══════════════════════════════════════════════ */
+  document.addEventListener('change', e => {
+    /* M1 file input */
+    if (e.target.id === 'file-input') { handleFiles([...e.target.files]); return; }
+    /* M1 partial qty */
+    if (e.target.dataset.action === 'qty-input') {
+      const key = e.target.dataset.key;
+      if (state.checks[key]) { state.checks[key].haveQty = Number(e.target.value); pushCheck(key); }
+      return;
+    }
+    /* M2 pick qty */
+    if (e.target.dataset.action === 'c2-qty') {
+      const key    = e.target.dataset.key;
+      const jobRef = state.c2.selectedJob;
+      if (!jobRef) return;
+      if (!state.c2.picks[jobRef]) state.c2.picks[jobRef] = {};
+      const val = e.target.value.trim();
+      state.c2.picks[jobRef][key] = { qty: val === '' ? null : Number(val) };
+      render(); return;
+    }
+    /* M3 short qty */
+    if (e.target.dataset.action === 'c3-qty') {
+      const key = e.target.dataset.key;
+      if (state.c3.delivered[key]) {
+        state.c3.delivered[key].deliveredQty = e.target.value === '' ? undefined : Number(e.target.value);
+      }
+      return;
+    }
+  });
+
+  /* ═══════════════════════════════════════════════
+     GOOGLE DRIVE PICKER  (unchanged from v2.2.1)
   ═══════════════════════════════════════════════ */
   function loadPickerApi() {
     return new Promise(resolve => {
@@ -796,10 +1064,8 @@
         scope: 'https://www.googleapis.com/auth/drive.readonly',
         callback: resp => {
           if (resp.error) { reject(resp.error); return; }
-          state.driveToken  = resp.access_token;
-          state.driveAuthed = true;
-          render();
-          resolve(resp.access_token);
+          state.driveToken = resp.access_token; state.driveAuthed = true;
+          render(); resolve(resp.access_token);
         },
       });
       tokenClient.requestAccessToken({ prompt: state.driveAuthed ? '' : 'consent' });
@@ -807,31 +1073,23 @@
   }
 
   function showPicker(token) {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const view = new google.picker.DocsView(google.picker.ViewId.DOCS)
-        .setMimeTypes('application/pdf')
-        .setMode(google.picker.DocsViewMode.LIST);
+        .setMimeTypes('application/pdf').setMode(google.picker.DocsViewMode.LIST);
       const picker = new google.picker.PickerBuilder()
-        .setAppId(GOOGLE_APP_ID)
-        .setOAuthToken(token)
-        .setDeveloperKey(GOOGLE_API_KEY)
-        .addView(view)
-        .setTitle('Select packing slip PDFs')
+        .setAppId(GOOGLE_APP_ID).setOAuthToken(token).setDeveloperKey(GOOGLE_API_KEY)
+        .addView(view).setTitle('Select packing slip PDFs')
         .enableFeature(google.picker.Feature.MULTISELECT_ENABLED)
         .setCallback(data => {
-          if (data.action === google.picker.Action.PICKED)  { resolve(data.docs); }
-          else if (data.action === google.picker.Action.CANCEL) { resolve([]); }
-        })
-        .build();
+          if (data.action === google.picker.Action.PICKED)  resolve(data.docs);
+          else if (data.action === google.picker.Action.CANCEL) resolve([]);
+        }).build();
       picker.setVisible(true);
     });
   }
 
   async function downloadDriveFile(fileId, token) {
-    const resp = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    const resp = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, { headers: { Authorization: `Bearer ${token}` } });
     if (!resp.ok) throw new Error(`Drive download failed: ${resp.status}`);
     return resp.blob();
   }
@@ -842,63 +1100,41 @@
       const token = await getOAuthToken();
       const docs  = await showPicker(token);
       if (!docs.length) return;
-      toast(`Downloading ${docs.length} file${docs.length > 1 ? 's' : ''} from Drive…`, 5000);
-      const files = await Promise.all(
-        docs.map(async doc => {
-          const blob = await downloadDriveFile(doc.id, token);
-          return new File([blob], doc.name, { type: 'application/pdf' });
-        })
-      );
+      toast(`Downloading ${docs.length} file${docs.length > 1 ? 's' : ''} from Drive\u2026`, 5000);
+      const files = await Promise.all(docs.map(async doc => {
+        const blob = await downloadDriveFile(doc.id, token);
+        return new File([blob], doc.name, { type: 'application/pdf' });
+      }));
       handleFiles(files);
     } catch (err) {
       console.error('Drive pick error:', err);
       if (String(err).includes('401') || String(err).includes('invalid_token')) {
-        state.driveToken  = null;
-        state.driveAuthed = false;
-        toast('Drive session expired — please sign in again');
-        render();
-      } else {
-        toast('Could not load from Google Drive. Try again.');
-      }
+        state.driveToken = null; state.driveAuthed = false;
+        toast('Drive session expired \u2014 please sign in again'); render();
+      } else { toast('Could not load from Google Drive. Try again.'); }
     }
   }
 
   /* ═══════════════════════════════════════════════
-     FILE HANDLING
+     FILE HANDLING + PDF PARSING  (unchanged from v2.2.1)
   ═══════════════════════════════════════════════ */
   async function handleFiles(files) {
     if (!files.length) return;
-
     const listEl = document.getElementById('file-list');
-    if (listEl) {
-      listEl.innerHTML = files.map(f =>
-        `<div class="flex gap-2 items-center text-sm mt-2"><span>📄</span><span>${esc(f.name)}</span></div>`
-      ).join('');
-    }
+    if (listEl) listEl.innerHTML = files.map(f => `<div class="flex gap-2 items-center text-sm mt-2"><span>&#128196;</span><span>${esc(f.name)}</span></div>`).join('');
     const prog = document.getElementById('parse-progress');
     if (prog) prog.style.display = '';
-
     const jobObjs = [];
-
     for (let i = 0; i < files.length; i++) {
-      setProgress(Math.round((i / files.length) * 80), `Parsing ${files[i].name}…`);
-      try {
-        const job = await parseFile(files[i]);
-        jobObjs.push(job);
-      } catch (err) {
-        console.error('Parse error:', files[i].name, err);
-        toast(`Could not parse ${files[i].name}`);
-      }
+      setProgress(Math.round(i / files.length * 80), `Parsing ${files[i].name}\u2026`);
+      try { jobObjs.push(await parseFile(files[i])); }
+      catch (err) { console.error('Parse error:', files[i].name, err); toast(`Could not parse ${files[i].name}`); }
     }
-
-    setProgress(90, 'Consolidating…');
+    setProgress(90, 'Consolidating\u2026');
     const masterList = buildMasterList(jobObjs);
     setProgress(100, 'Done!');
-
     const session = await createSession(masterList, jobObjs.map(j => j.id));
-    state.session = session;
-    state.checks  = {};
-    state.view    = 'session';
+    state.session = session; state.checks = {}; state.view = 'session';
     setTimeout(() => render(), 400);
   }
 
@@ -909,12 +1145,6 @@
     if (lbl)  lbl.textContent  = label;
   }
 
-  /* ═══════════════════════════════════════════════
-     PDF TEXT EXTRACTION + PARSER
-     (restored from the Friday v2.0.1 build, faithful)
-  ═══════════════════════════════════════════════ */
-
-  // Rebuild proper lines from PDF text fragments by sorting into rows.
   async function extractPdfText(file) {
     const pdf = await pdfjsLib.getDocument({ data: await file.arrayBuffer() }).promise;
     let full = '';
@@ -923,8 +1153,7 @@
       const content = await page.getTextContent();
       const sorted  = content.items.slice().sort((a, b) => {
         const dy = b.transform[5] - a.transform[5];
-        if (Math.abs(dy) > 3) return dy;
-        return a.transform[4] - b.transform[4];
+        return Math.abs(dy) > 3 ? dy : a.transform[4] - b.transform[4];
       });
       const lines = []; let cur = [], lastY = null;
       for (const item of sorted) {
@@ -940,25 +1169,19 @@
     return full;
   }
 
-  async function parseFile(file) {
-    const text = await extractPdfText(file);
-    return parsePackingSlip(text, file.name);
-  }
+  async function parseFile(file) { return parsePackingSlip(await extractPdfText(file), file.name); }
 
   const ITEM_RE  = /^(\d+)\.\s+(.+?)\s{2,}(\d+(?:\.\d+)?)\s*(pcs|bundle|box|pk|2pk|3pk|4pk|pair|roll|m|lm|set|kit|each|no\.?|nr\.?)?$/i;
   const ITEM_RE2 = /^(\d+)\.\s+(.+)\s+(\d+(?:\.\d+)?)\s*(pcs|bundle|box|pk|2pk|3pk|4pk|pair|roll|m|lm|set|kit|each)?$/i;
   const SKU_RE   = /^[A-Z0-9][A-Z0-9\-_]{2,}$/i;
-  const BUNDLE_KW= /\bkit\b|\bbundle\b/i;
+  const BUNDLE_KW = /\bkit\b|\bbundle\b/i;
   const SUB_RE   = /^(\d+)x\s+(.+)$/i;
-  // Catalogue description rows to skip. Add other collection names here if needed.
   const SKIP_RE  = /mull collection supply|bute collection supply/i;
 
   function normaliseUnit(u) {
     u = u.toLowerCase().trim();
     if (!u || u === 'no' || u === 'nr') return 'pcs';
-    if (u === '2pk') return '2-pack';
-    if (u === '3pk') return '3-pack';
-    if (u === '4pk') return '4-pack';
+    if (u === '2pk') return '2-pack'; if (u === '3pk') return '3-pack'; if (u === '4pk') return '4-pack';
     return u;
   }
 
@@ -967,40 +1190,24 @@
     let jobId   = filename.replace(/\.pdf$/i, '');
     const qm    = text.match(/Quote\s*#\s*(\S+)/i);
     if (qm) jobId = `Q${qm[1]}`;
-
-    const items = [];
-    let i = 0;
+    const items = []; let i = 0;
     while (i < lines.length) {
       const line = lines[i];
       const m    = line.match(ITEM_RE) || line.match(ITEM_RE2);
       if (m) {
-        const lineNum = parseInt(m[1]);
-        const name    = m[2].trim();
-        const qty     = parseFloat(m[3]);
-        const unit    = normaliseUnit(m[4] || '');
+        const name = m[2].trim(); const qty = parseFloat(m[3]); const unit = normaliseUnit(m[4] || '');
         let j = i + 1, sku = '';
-        if (j < lines.length && SKU_RE.test(lines[j]) && !/^\d+\.\s/.test(lines[j])) {
-          sku = lines[j].toUpperCase(); j++;
-        }
-        if (SKIP_RE.test(name)) {
-          while (j < lines.length && !/^\d+\.\s/.test(lines[j])) j++;
-          i = j; continue;
-        }
+        if (j < lines.length && SKU_RE.test(lines[j]) && !/^\d+\.\s/.test(lines[j])) { sku = lines[j].toUpperCase(); j++; }
+        if (SKIP_RE.test(name)) { while (j < lines.length && !/^\d+\.\s/.test(lines[j])) j++; i = j; continue; }
         if (BUNDLE_KW.test(name) || BUNDLE_KW.test(unit)) {
           const subs = [];
           while (j < lines.length && !/^\d+\.\s/.test(lines[j])) {
             const sm = lines[j].trim().match(SUB_RE);
-            if (sm && sm[2].trim().length > 1) {
-              subs.push({ name: sm[2].trim(), sku: '', qty: parseInt(sm[1]) * qty, unit: 'pcs',
-                fromBundle: `${name}${sku ? ' (' + sku + ')' : ''}`, lineNum });
-            }
+            if (sm && sm[2].trim().length > 1) subs.push({ name: sm[2].trim(), sku: '', qty: parseInt(sm[1]) * qty, unit: 'pcs', fromBundle: `${name}${sku ? ' (' + sku + ')' : ''}` });
             j++;
           }
-          if (subs.length) subs.forEach(s => items.push(s));
-          else items.push({ name, sku, qty, unit, fromBundle: null, lineNum });
-        } else {
-          items.push({ name, sku, qty, unit, fromBundle: null, lineNum });
-        }
+          if (subs.length) subs.forEach(s => items.push(s)); else items.push({ name, sku, qty, unit, fromBundle: null });
+        } else { items.push({ name, sku, qty, unit, fromBundle: null }); }
         i = j; continue;
       }
       i++;
@@ -1008,131 +1215,233 @@
     return { id: jobId, name: jobId, filename, items };
   }
 
-  // Consolidate items across slips. Key on SKU when present (case-insensitive),
-  // else on name. Sums quantities and collects the jobs each item appears on.
   function buildMasterList(jobs) {
     const map = new Map();
     jobs.forEach(job => {
       job.items.forEach(item => {
         const key = item.sku ? item.sku.toUpperCase() : item.name.toLowerCase();
-        if (map.has(key)) {
-          const ex = map.get(key);
-          ex.qty += item.qty;
-          if (!ex.jobs.includes(job.id)) ex.jobs.push(job.id);
-        } else {
-          map.set(key, {
-            key,
-            name: item.name,
-            sku: item.sku || '',
-            qty: item.qty,
-            unit: item.unit,
-            fromBundle: item.fromBundle || null,
-            jobs: [job.id]
-          });
-        }
+        if (map.has(key)) { const ex = map.get(key); ex.qty += item.qty; if (!ex.jobs.includes(job.id)) ex.jobs.push(job.id); }
+        else map.set(key, { key, name: item.name, sku: item.sku || '', qty: item.qty, unit: item.unit, fromBundle: item.fromBundle || null, jobs: [job.id] });
       });
     });
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /* ═══════════════════════════════════════════════
-     SUPABASE — sessions & checks
+     SUPABASE — M1 sessions & checks  (unchanged)
   ═══════════════════════════════════════════════ */
   async function createSession(masterList, jobs) {
     const code = generateCode();
-    const { data, error } = await sb.from('sessions').insert({
-      code, master_list: masterList, jobs, created_at: new Date().toISOString(),
-    }).select().single();
-    if (error) {
-      console.error('Session create error:', error);
-      toast('Could not save session — working offline');
-      return { id: 'local', code, masterList, jobs };
-    }
+    const { data, error } = await sb.from('sessions').insert({ code, master_list: masterList, jobs, created_at: new Date().toISOString() }).select().single();
+    if (error) { console.error(error); toast('Could not save session \u2014 working offline'); return { id: 'local', code, masterList, jobs }; }
     subscribeToChecks(data.id);
     return { id: data.id, code, masterList, jobs };
   }
 
   async function joinSession(code) {
     const { data, error } = await sb.from('sessions').select('*').eq('code', code).single();
-    if (error || !data) { toast('Session not found — check the code'); return; }
+    if (error || !data) { toast('Session not found \u2014 check the code'); return; }
     state.session = { id: data.id, code: data.code, masterList: data.master_list, jobs: data.jobs };
-    state.checks  = {};
-    state.role    = 'warehouse';
-    state.view    = 'check';
-    const { data: existingChecks } = await sb.from('checks')
-      .select('*').eq('session_id', data.id).order('updated_at', { ascending: false });
-    if (existingChecks) {
-      const masterList = data.master_list || [];
-      // Build a lookup: normalised key / sku / name -> master key (case-insensitive)
-      const nameToKey = new Map();
-      for (const item of masterList) {
-        nameToKey.set(String(item.key).toLowerCase().trim(), item.key);
-        if (item.sku) nameToKey.set(String(item.sku).toLowerCase().trim(), item.key);
-        nameToKey.set(String(item.name).toLowerCase().trim(), item.key);
+    state.checks  = {}; state.role = 'warehouse'; state.view = 'check';
+    const { data: ec } = await sb.from('checks').select('*').eq('session_id', data.id).order('updated_at', { ascending: false });
+    if (ec) {
+      const ml = data.master_list || [];
+      const ntk = new Map();
+      for (const item of ml) {
+        ntk.set(String(item.key).toLowerCase().trim(), item.key);
+        if (item.sku) ntk.set(String(item.sku).toLowerCase().trim(), item.key);
+        ntk.set(String(item.name).toLowerCase().trim(), item.key);
       }
       const seen = new Set();
-      for (const c of existingChecks) {
+      for (const c of ec) {
         if (!c.status || c.status === 'unchecked') continue;
-        const resolvedKey = nameToKey.get(String(c.item_key).toLowerCase().trim()) || c.item_key;
-        if (!seen.has(resolvedKey)) {
-          seen.add(resolvedKey);
-          state.checks[resolvedKey] = { status: c.status, haveQty: c.have_qty };
-        }
+        const rk = ntk.get(String(c.item_key).toLowerCase().trim()) || c.item_key;
+        if (!seen.has(rk)) { seen.add(rk); state.checks[rk] = { status: c.status, haveQty: c.have_qty }; }
       }
     }
-    subscribeToChecks(data.id);
-    render();
+    subscribeToChecks(data.id); render();
   }
 
   function subscribeToChecks(sessionId) {
     sb.channel('checks-' + sessionId)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'checks',
-          filter: `session_id=eq.${sessionId}` }, payload => {
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'checks', filter: `session_id=eq.${sessionId}` }, payload => {
         const c = payload.new;
-        if (c.status && c.status !== 'unchecked') {
-          state.checks[c.item_key] = { status: c.status, haveQty: c.have_qty };
-        }
+        if (c.status && c.status !== 'unchecked') state.checks[c.item_key] = { status: c.status, haveQty: c.have_qty };
         if (state.view === 'check') render();
-      })
-      .subscribe();
+      }).subscribe();
   }
 
   async function setStatus(key, status) {
-    if (state.checks[key]?.status === status) { delete state.checks[key]; }
-    else { state.checks[key] = { status }; }
-    render();
-    await pushCheck(key);
+    if (state.checks[key]?.status === status) { delete state.checks[key]; } else { state.checks[key] = { status }; }
+    render(); await pushCheck(key);
   }
 
   async function pushCheck(key) {
     if (!state.session?.id || state.session.id === 'local') return;
     const c = state.checks[key];
-    await sb.from('checks').insert({
-      session_id: state.session.id,
-      item_key:   key,
-      status:     c?.status || null,
-      have_qty:   c?.haveQty || null,
-      created_at: new Date().toISOString(),
-    });
+    await sb.from('checks').insert({ session_id: state.session.id, item_key: key, status: c?.status || null, have_qty: c?.haveQty || null, created_at: new Date().toISOString() });
   }
 
   /* ═══════════════════════════════════════════════
-     REPORT — copy to clipboard  (SKU included)
+     SUPABASE — M2 pick completion
+  ═══════════════════════════════════════════════ */
+  async function loadC2Session() {
+    const el = document.getElementById('c2-code');
+    if (!el) return;
+    const code = el.value.trim().toUpperCase();
+    if (!code) { toast('Enter a session code'); return; }
+    state.c2.loading = true; render();
+    const { data, error } = await sb.from('sessions').select('*').eq('code', code).single();
+    state.c2.loading = false;
+    if (error || !data) { toast('Session not found \u2014 check the code'); render(); return; }
+    state.c2.session = { id: data.id, code: data.code, masterList: data.master_list, jobs: data.jobs };
+    /* load any picks already saved for this session */
+    const { data: existing } = await sb.from('pick_completions').select('*').eq('session_id', data.id);
+    if (existing && existing.length) {
+      existing.forEach(row => {
+        if (!state.c2.picks[row.job_ref]) state.c2.picks[row.job_ref] = {};
+        if (!state.c2.picks[row.job_ref][row.item_key]) {
+          state.c2.picks[row.job_ref][row.item_key] = { qty: row.picked_qty };
+        }
+      });
+    }
+    state.view = 'c2-jobs'; render();
+  }
+
+  async function submitC2Picks() {
+    const s      = state.c2.session;
+    const jobRef = state.c2.selectedJob;
+    const picks  = state.c2.picks[jobRef] || {};
+    const items  = s.masterList.filter(i => i.jobs && i.jobs.includes(jobRef));
+
+    const rows = items.map(item => {
+      const p          = picks[item.key];
+      const pickedQty  = (p && p.qty !== null && p.qty !== undefined) ? Number(p.qty) : item.qty;
+      const shortfall  = Math.max(0, item.qty - pickedQty);
+      return {
+        session_id:   s.id,
+        job_ref:      jobRef,
+        item_key:     item.key,
+        item_name:    item.name,
+        needed_qty:   item.qty,
+        picked_qty:   pickedQty,
+        shortfall,
+        updated_at:   new Date().toISOString(),
+      };
+    });
+
+    const { error } = await sb.from('pick_completions').insert(rows);
+    if (error) { console.error(error); toast('Could not save \u2014 check your connection'); return; }
+
+    /* update local state with the resolved qtys */
+    if (!state.c2.picks[jobRef]) state.c2.picks[jobRef] = {};
+    rows.forEach(r => { state.c2.picks[jobRef][r.item_key] = { qty: r.picked_qty }; });
+
+    state.view = 'c2-done'; render();
+  }
+
+  function copyC2Shortfall() {
+    const s      = state.c2.session;
+    const jobRef = state.c2.selectedJob;
+    const picks  = state.c2.picks[jobRef] || {};
+    const items  = s.masterList.filter(i => i.jobs && i.jobs.includes(jobRef));
+    const shorts = items.filter(i => { const p = picks[i.key]; return p && p.qty !== null && Number(p.qty) < i.qty; });
+    if (!shorts.length) { toast('Nothing short'); return; }
+    const lines = [
+      'ANNICK BATHROOMS \u2014 PICK SHORTFALL',
+      `Session: ${s.code}  Job: ${jobRef}`,
+      `Generated: ${new Date().toLocaleString('en-GB')}`, '',
+      'Item | SKU | Needed | Picked | Short', '\u2500'.repeat(60),
+      ...shorts.map(i => { const p = picks[i.key]; return `${i.name} | ${i.sku || ''} | ${i.qty} | ${p.qty} | ${i.qty - Number(p.qty)}`; }),
+    ];
+    navigator.clipboard.writeText(lines.join('\n')).then(() => toast('Shortfall copied!'));
+  }
+
+  /* ═══════════════════════════════════════════════
+     SUPABASE — M3 driver delivery
+  ═══════════════════════════════════════════════ */
+  async function loadC3Job() {
+    const jobEl    = document.getElementById('c3-job');
+    const driverEl = document.getElementById('c3-driver');
+    if (!jobEl) return;
+    let jobRef = jobEl.value.trim().toUpperCase();
+    if (!jobRef) { toast('Enter a job reference'); return; }
+    if (/^\d+$/.test(jobRef)) jobRef = 'Q' + jobRef;
+    state.c3.jobRef     = jobRef;
+    state.c3.driverName = driverEl ? driverEl.value.trim() : '';
+    state.c3.loading    = true; render();
+
+    /* prefer Module 2 pick data */
+    const { data: pickData } = await sb.from('pick_completions').select('*').eq('job_ref', jobRef);
+    if (pickData && pickData.length > 0) {
+      const seen = new Map();
+      pickData.forEach(row => {
+        if (!seen.has(row.item_key) || row.updated_at > seen.get(row.item_key).updated_at) seen.set(row.item_key, row);
+      });
+      state.c3.items   = [...seen.values()].map(r => ({ key: r.item_key, name: r.item_name, sku: '', qty: r.picked_qty, unit: 'pcs', jobs: [jobRef] }));
+      state.c3.session = null;
+    } else {
+      /* fall back to session master_list */
+      const { data: sessions } = await sb.from('sessions').select('*').contains('jobs', [jobRef]).order('created_at', { ascending: false }).limit(1);
+      if (!sessions || !sessions.length) {
+        state.c3.loading = false;
+        toast('No data found for ' + jobRef + '. Has Pick Verifier been run for this job?');
+        render(); return;
+      }
+      const sess = sessions[0];
+      state.c3.session = sess;
+      state.c3.items   = (sess.master_list || []).filter(i => i.jobs && i.jobs.includes(jobRef));
+      if (!state.c3.items.length) { state.c3.loading = false; toast('No items found for ' + jobRef); render(); return; }
+    }
+
+    state.c3.loading   = false;
+    state.c3.delivered = {};
+    state.view         = 'c3-check'; render();
+  }
+
+  async function submitC3Delivery() {
+    const items     = state.c3.items;
+    const delivered = state.c3.delivered;
+    const sessionId = state.c3.session ? state.c3.session.id : null;
+
+    const rows = items.map(item => {
+      const d            = delivered[item.key] || {};
+      const deliveredQty = d.status === 'delivered' ? item.qty
+        : d.status === 'short' ? (d.deliveredQty !== undefined ? Number(d.deliveredQty) : 0)
+        : item.qty;
+      return {
+        session_id:    sessionId,
+        job_ref:       state.c3.jobRef,
+        item_key:      item.key,
+        item_name:     item.name,
+        picked_qty:    item.qty,
+        delivered_qty: deliveredQty,
+        shortfall:     Math.max(0, item.qty - deliveredQty),
+        driver_name:   state.c3.driverName || null,
+        updated_at:    new Date().toISOString(),
+      };
+    });
+
+    const { error } = await sb.from('deliveries').insert(rows);
+    if (error) { console.error(error); toast('Could not save \u2014 check your connection'); return; }
+    state.view = 'c3-done'; render();
+  }
+
+  /* ═══════════════════════════════════════════════
+     M1 REPORT — copy to clipboard  (unchanged)
   ═══════════════════════════════════════════════ */
   function copyReport() {
     const items  = state.session.masterList;
     const checks = state.checks;
-    const shorts = items.filter(i => {
-      const c = checks[i.key];
-      return c && (c.status === 'short' || c.status === 'part');
-    });
-    if (!shorts.length) { toast('Nothing to order — all in stock!'); return; }
-    const lines = ['ANNICK BATHROOMS — PURCHASING REPORT', `Session: ${state.session.code}`,
+    const shorts = items.filter(i => { const c = checks[i.key]; return c && (c.status === 'short' || c.status === 'part'); });
+    if (!shorts.length) { toast('Nothing to order \u2014 all in stock!'); return; }
+    const lines = [
+      'ANNICK BATHROOMS \u2014 PURCHASING REPORT',
+      `Session: ${state.session.code}`,
       `Generated: ${new Date().toLocaleString('en-GB')}`, '',
-      'Item | SKU | Needed | Have | To Order | Jobs', '─'.repeat(64),
+      'Item | SKU | Needed | Have | To Order | Jobs', '\u2500'.repeat(64),
       ...shorts.map(item => {
-        const c    = checks[item.key];
-        const have = c.status === 'part' ? (Number(c.haveQty) || 0) : 0;
+        const c = checks[item.key]; const have = c.status === 'part' ? (Number(c.haveQty) || 0) : 0;
         return `${item.name} | ${item.sku || ''} | ${item.qty} | ${have} | ${item.qty - have} | ${(item.jobs || []).join(', ')}`;
       }),
     ];
@@ -1143,20 +1452,12 @@
      UTILITIES
   ═══════════════════════════════════════════════ */
   function generateCode() {
-    const now = new Date();
-    const yy  = String(now.getFullYear()).slice(2);
-    const mm  = String(now.getMonth() + 1).padStart(2, '0');
-    const n   = Math.floor(Math.random() * 9) + 1;
-    return `AB-${yy}${mm}-${n}`;
+    const now = new Date(); const yy = String(now.getFullYear()).slice(2); const mm = String(now.getMonth() + 1).padStart(2, '0');
+    return `AB-${yy}${mm}-${Math.floor(Math.random() * 9) + 1}`;
   }
 
   function esc(str) {
-    return String(str)
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
+    return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
   }
 
   /* ═══════════════════════════════════════════════
@@ -1165,7 +1466,6 @@
   render();
 
 })();
-
 </script>
 </body>
 </html>
