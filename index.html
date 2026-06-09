@@ -368,7 +368,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span id="header-sub">Stock Check &mdash; v2.3.0</span>
+      <span id="header-sub">v2.3.0</span>
     </div>
   </div>
 
@@ -406,7 +406,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
   const MODULE_LABELS = {
-    home: 'Stock Check \u2014 v2.3.0',
+    home: 'v2.3.0',
     verifier: 'Pick Verifier',
     completion: 'Pick Completion',
     delivery: 'Driver Delivery',
@@ -1285,6 +1285,15 @@
   /* ═══════════════════════════════════════════════
      SUPABASE — M2 pick completion
   ═══════════════════════════════════════════════ */
+
+  /* Normalise a job ref that may be a plain string or a full job object
+     (sessions created by older app versions stored the whole object). */
+  function normJobRef(j) {
+    if (typeof j === 'string' && j.length) return j;
+    if (j && typeof j === 'object') return j.id || j.job_ref || j.code || JSON.stringify(j);
+    return String(j);
+  }
+
   async function loadC2Session() {
     const el = document.getElementById('c2-code');
     if (!el) return;
@@ -1294,7 +1303,20 @@
     const { data, error } = await sb.from('sessions').select('*').eq('code', code).single();
     state.c2.loading = false;
     if (error || !data) { toast('Session not found \u2014 check the code'); render(); return; }
-    state.c2.session = { id: data.id, code: data.code, masterList: data.master_list, jobs: data.jobs };
+    /* Normalise masterList item job refs to plain strings (handles old sessions
+       where item.jobs may contain objects instead of string IDs). */
+    const masterList = (data.master_list || []).map(item => ({
+      ...item,
+      jobs: (item.jobs || []).map(normJobRef),
+    }));
+    /* Derive the job list from masterList items — more reliable than sessions.jobs
+       which may contain full objects depending on which app version created the session. */
+    const jobSet = new Set();
+    masterList.forEach(item => (item.jobs || []).forEach(j => jobSet.add(j)));
+    /* Fall back to sessions.jobs (normalised) if no jobs found in items */
+    if (jobSet.size === 0) (data.jobs || []).forEach(j => jobSet.add(normJobRef(j)));
+    const jobs = [...jobSet].sort();
+    state.c2.session = { id: data.id, code: data.code, masterList, jobs };
     /* load any picks already saved for this session */
     const { data: existing } = await sb.from('pick_completions').select('*').eq('session_id', data.id);
     if (existing && existing.length) {
@@ -1382,15 +1404,21 @@
       state.c3.session = null;
     } else {
       /* fall back to session master_list */
-      const { data: sessions } = await sb.from('sessions').select('*').contains('jobs', [jobRef]).order('created_at', { ascending: false }).limit(1);
-      if (!sessions || !sessions.length) {
+      const { data: sessions } = await sb.from('sessions').select('*').order('created_at', { ascending: false }).limit(30);
+      /* filter client-side — handles sessions.jobs stored as strings OR objects */
+      const matched = (sessions || []).find(s =>
+        (s.jobs || []).some(j => normJobRef(j) === jobRef) ||
+        (s.master_list || []).some(i => (i.jobs || []).map(normJobRef).includes(jobRef))
+      );
+      if (!matched) {
         state.c3.loading = false;
         toast('No data found for ' + jobRef + '. Has Pick Verifier been run for this job?');
         render(); return;
       }
-      const sess = sessions[0];
+      const sess = matched;
       state.c3.session = sess;
-      state.c3.items   = (sess.master_list || []).filter(i => i.jobs && i.jobs.includes(jobRef));
+      state.c3.items   = (sess.master_list || [])
+        .filter(i => (i.jobs || []).map(normJobRef).includes(jobRef));
       if (!state.c3.items.length) { state.c3.loading = false; toast('No items found for ' + jobRef); render(); return; }
     }
 
