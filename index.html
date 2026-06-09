@@ -716,7 +716,7 @@
       const entered = Object.values(picks).filter(p => p.qty !== null && p.qty !== undefined).length;
       return `
         <div class="item-row" style="cursor:pointer;" data-action="c2-select-job" data-job="${esc(jobRef)}">
-          <div class="item-name">${esc(jobRef)}</div>
+          <div class="item-name">${esc(displayJobRef(jobRef))}</div>
           <div class="item-qty">${items.length} item${items.length !== 1 ? 's' : ''}</div>
           ${entered > 0 ? `<span class="job-tag">${entered} entered</span>` : ''}
           <div style="color:var(--muted);font-size:1.2rem;flex-shrink:0;">&#8250;</div>
@@ -767,7 +767,7 @@
       <div class="card">
         <div class="flex justify-between items-center" style="margin-bottom:10px;">
           <div>
-            <span class="card-title" style="margin-bottom:0;">Picking &mdash; ${esc(jobRef)}</span>
+            <span class="card-title" style="margin-bottom:0;">Picking &mdash; ${esc(displayJobRef(jobRef))}</span>
             <div class="text-muted text-sm">${entered}/${total} entered &middot; blank = fully picked</div>
           </div>
           <button class="btn btn-primary" data-action="c2-submit">Submit &#8594;</button>
@@ -794,7 +794,7 @@
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="c2-back-jobs">&#8592; Jobs</button></div>
       <div class="card">
-        <div class="card-title">Pick submitted &mdash; ${esc(jobRef)}</div>
+        <div class="card-title">Pick submitted &mdash; ${esc(displayJobRef(jobRef))}</div>
         ${shorts.length === 0
           ? `<div class="empty-state"><div class="icon">&#127881;</div><p>Fully picked &mdash; nothing short.</p></div>`
           : `<p class="text-muted text-sm" style="margin-bottom:12px;">${shorts.length} item${shorts.length !== 1 ? 's' : ''} short:</p>
@@ -859,7 +859,7 @@
       <div class="card">
         <div class="flex justify-between items-center" style="margin-bottom:10px;">
           <div>
-            <span class="card-title" style="margin-bottom:0;">Delivering &mdash; ${esc(state.c3.jobRef)}</span>
+            <span class="card-title" style="margin-bottom:0;">Delivering &mdash; ${esc(displayJobRef(state.c3.jobRef))}</span>
             <div class="text-muted text-sm">${done}/${total} confirmed &middot; tick each item as it lands</div>
           </div>
           <button class="btn btn-primary" data-action="c3-submit" ${done < 1 ? 'disabled' : ''}>Submit &#8594;</button>
@@ -882,7 +882,7 @@
 
     return `
       <div class="card">
-        <div class="card-title">Delivery submitted &mdash; ${esc(state.c3.jobRef)}</div>
+        <div class="card-title">Delivery submitted &mdash; ${esc(displayJobRef(state.c3.jobRef))}</div>
         ${shorts.length === 0
           ? `<div class="empty-state"><div class="icon">&#127881;</div><p>Full delivery &mdash; all items confirmed on site.</p></div>`
           : `<p class="text-muted text-sm" style="margin-bottom:12px;">${shorts.length} item${shorts.length !== 1 ? 's' : ''} not fully delivered:</p>
@@ -1286,12 +1286,27 @@
      SUPABASE — M2 pick completion
   ═══════════════════════════════════════════════ */
 
-  /* Normalise a job ref that may be a plain string or a full job object
-     (sessions created by older app versions stored the whole object). */
+  /* Normalise a job ref that may be a plain string or a full job object.
+     Older sessions stored line-item objects {qty, jobName, lineNum, filename}
+     rather than simple ID strings — extract the meaningful identifier. */
   function normJobRef(j) {
     if (typeof j === 'string' && j.length) return j;
-    if (j && typeof j === 'object') return j.id || j.job_ref || j.code || JSON.stringify(j);
+    if (j && typeof j === 'object') {
+      return j.id || j.job_ref || j.code || j.jobName ||
+             (j.filename ? j.filename.replace(/\.pdf$/i, '') : null) ||
+             JSON.stringify(j);
+    }
     return String(j);
+  }
+
+  /* Return a clean label for a job ref string. Strips trailing descriptive
+     words from filenames like "1659 packing slip 24_5_26" so the list shows
+     "1659". Leaves tidy refs like "Q1785" unchanged. */
+  function displayJobRef(ref) {
+    if (!ref) return ref;
+    if (/^Q\d+$/i.test(ref)) return ref.toUpperCase();
+    const m = ref.match(/^(\d+)/);
+    return m ? m[1] : ref;
   }
 
   async function loadC2Session() {
