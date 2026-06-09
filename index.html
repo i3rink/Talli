@@ -574,7 +574,7 @@
       <div class="card">
         <div class="card-title">Join a Session (Warehouse)</div>
         <div class="flex gap-2 flex-wrap items-center">
-          <input id="join-code" type="text" placeholder="Enter session code e.g. AB-2506-1"
+          <input id="join-code" type="text" placeholder="Enter session code e.g. AB3K7P"
             style="flex:1;min-width:160px;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
           <button class="btn btn-outline" data-action="join-session">Join &#8594;</button>
         </div>
@@ -699,7 +699,7 @@
         <div class="card-title">Pick Completion</div>
         <p class="text-muted text-sm" style="margin-bottom:14px;">Enter the session code from Pick Verifier to load this week&#8217;s jobs.</p>
         <div class="flex gap-2 flex-wrap items-center">
-          <input id="c2-code" type="text" placeholder="e.g. AB-2506-1" autocapitalize="characters"
+          <input id="c2-code" type="text" placeholder="e.g. AB3K7P" autocapitalize="characters"
             style="flex:1;min-width:160px;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
           <button class="btn btn-primary" data-action="c2-load">Load Session &#8594;</button>
         </div>
@@ -976,7 +976,8 @@
     if (action === 'browse-files') { document.getElementById('file-input').click(); return; }
     if (action === 'drive-pick')   { handleDrivePick(); return; }
     if (action === 'join-session') {
-      const code = document.getElementById('join-code').value.trim().toUpperCase();
+      const raw = document.getElementById('join-code').value.trim();
+      const code = raw.toUpperCase().replace(/[\s\-]/g, '');
       if (code) joinSession(code); return;
     }
     if (action === 'copy-code')   { navigator.clipboard.writeText(state.session.code).then(() => toast('Code copied!')); return; }
@@ -1239,7 +1240,16 @@
   }
 
   async function joinSession(code) {
-    const { data, error } = await sb.from('sessions').select('*').eq('code', code).single();
+    /* code arrives already uppercased + dash-stripped from the click handler.
+       Try exact match first (new format), then fall back to the old dashed
+       format AB-YYMM-N in case the warehouse team is joining an older session. */
+    let { data, error } = await sb.from('sessions').select('*').eq('code', code).single();
+    if ((error || !data) && code.length === 6 && code.startsWith('AB')) {
+      /* try inserting dashes: AB2606R → AB-2606-R */
+      const dashed = code.slice(0,2) + '-' + code.slice(2,6) + '-' + code.slice(6);
+      const res = await sb.from('sessions').select('*').eq('code', dashed).single();
+      data = res.data; error = res.error;
+    }
     if (error || !data) { toast('Session not found \u2014 check the code'); return; }
     state.session = { id: data.id, code: data.code, masterList: data.master_list, jobs: data.jobs };
     state.checks  = {}; state.role = 'warehouse'; state.view = 'check';
@@ -1304,18 +1314,23 @@
      "1659". Leaves tidy refs like "Q1785" unchanged. */
   function displayJobRef(ref) {
     if (!ref) return ref;
-    if (/^Q\d+$/i.test(ref)) return ref.toUpperCase();
-    const m = ref.match(/^(\d+)/);
-    return m ? m[1] : ref;
+    const stripped = ref.replace(/^Q/i, '');
+    const m = stripped.match(/^(\d+)/);
+    return m ? m[1] : stripped;
   }
 
   async function loadC2Session() {
     const el = document.getElementById('c2-code');
     if (!el) return;
-    const code = el.value.trim().toUpperCase();
+    const code = el.value.trim().toUpperCase().replace(/[\s\-]/g, '');
     if (!code) { toast('Enter a session code'); return; }
     state.c2.loading = true; render();
-    const { data, error } = await sb.from('sessions').select('*').eq('code', code).single();
+    let { data, error } = await sb.from('sessions').select('*').eq('code', code).single();
+    if ((error || !data) && code.length === 6 && code.startsWith('AB')) {
+      const dashed = code.slice(0,2) + '-' + code.slice(2,6) + '-' + code.slice(6);
+      const res = await sb.from('sessions').select('*').eq('code', dashed).single();
+      data = res.data; error = res.error;
+    }
     state.c2.loading = false;
     if (error || !data) { toast('Session not found \u2014 check the code'); render(); return; }
     /* Normalise masterList item job refs to plain strings (handles old sessions
@@ -1495,8 +1510,10 @@
      UTILITIES
   ═══════════════════════════════════════════════ */
   function generateCode() {
-    const now = new Date(); const yy = String(now.getFullYear()).slice(2); const mm = String(now.getMonth() + 1).padStart(2, '0');
-    return `AB-${yy}${mm}-${Math.floor(Math.random() * 9) + 1}`;
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    let suffix = '';
+    for (let i = 0; i < 4; i++) suffix += chars[Math.floor(Math.random() * chars.length)];
+    return 'AB' + suffix;
   }
 
   function esc(str) {
