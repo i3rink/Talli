@@ -24,7 +24,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
-    /* ── Version: 2.3.0 ── */
+    /* ── Version: 2.3.1 ── */
 
     :root {
       --teal:        #0075ab;
@@ -347,6 +347,31 @@
       border-radius: 20px; background: #fee2e2; color: var(--red);
     }
     .dash-count.ok { background: #d1fae5; color: var(--green); }
+
+    /* ── Dashboard session expand ── */
+    .dash-session {
+      border-bottom: 1px solid var(--border);
+    }
+    .dash-session:last-child { border-bottom: none; }
+    .dash-session-head {
+      display: flex; align-items: center; gap: 8px;
+      padding: 9px 16px; cursor: pointer; user-select: none;
+      background: var(--bg);
+    }
+    .dash-session-head:hover { background: var(--border); }
+    .dash-session-code {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-size: .78rem; font-weight: 700; letter-spacing: .06em;
+      color: var(--muted); text-transform: uppercase; flex: 1;
+    }
+    .dash-session-meta { font-size: .75rem; color: var(--muted); }
+    .dash-session-chevron {
+      font-size: .75rem; color: var(--muted); transition: transform .15s; flex-shrink: 0;
+    }
+    .dash-session-chevron.open { transform: rotate(90deg); }
+    .dash-session-body { display: none; }
+    .dash-session-body.open { display: block; }
+
     .dash-job-group { border-bottom: 1px solid var(--border); }
     .dash-job-group:last-child { border-bottom: none; }
     .dash-job-label {
@@ -429,7 +454,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span id="header-sub">v2.3.0</span>
+      <span id="header-sub">v2.3.1</span>
     </div>
   </div>
 
@@ -467,7 +492,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
   const MODULE_LABELS = {
-    home: 'v2.3.0',
+    home: 'v2.3.1',
     verifier: 'Pick Verifier',
     completion: 'Pick Completion',
     delivery: 'Driver Delivery',
@@ -494,7 +519,7 @@
     /* global */
     view:   'home',
     module: 'home',
-    /* module 1 — pick verifier (unchanged) */
+    /* module 1 — pick verifier */
     session: null,
     checks:  {},
     role:    'office',
@@ -511,6 +536,8 @@
     /* home dashboard */
     dash: { loading: true, m1: [], m2: [], m3: [] },
     dashUnlocked: false,
+    /* expanded session keys in dashboard M1 */
+    dashExpanded: {},
   };
 
   let snakeAnimId = null;
@@ -550,24 +577,19 @@
     applyTheme(state.module);
     const root = document.getElementById('root');
     const v = state.view;
-    /* home */
-    if (v === 'home')       { root.innerHTML = renderHome(); }
-    /* module 1 */
-    else if (v === 'upload')   { root.innerHTML = renderUpload(); }
-    else if (v === 'session')  { root.innerHTML = renderSession(); }
-    else if (v === 'check')    { root.innerHTML = renderCheck(); }
-    else if (v === 'report')   { root.innerHTML = renderReport(); }
-    /* module 2 */
-    else if (v === 'c2-home')  { root.innerHTML = renderC2Home(); }
-    else if (v === 'c2-jobs')  { root.innerHTML = renderC2Jobs(); }
-    else if (v === 'c2-pick')  { root.innerHTML = renderC2Pick(); }
-    else if (v === 'c2-done')  { root.innerHTML = renderC2Done(); }
-    /* module 3 */
-    else if (v === 'c3-home')  { root.innerHTML = renderC3Home(); }
-    else if (v === 'c3-check') { root.innerHTML = renderC3Check(); }
-    else if (v === 'c3-done')  { root.innerHTML = renderC3Done(); }
-    /* module 4 */
-    else if (v === 'c4-overview') { root.innerHTML = renderC4Overview(); }
+    if (v === 'home')          root.innerHTML = renderHome();
+    else if (v === 'upload')   root.innerHTML = renderUpload();
+    else if (v === 'session')  root.innerHTML = renderSession();
+    else if (v === 'check')    root.innerHTML = renderCheck();
+    else if (v === 'report')   root.innerHTML = renderReport();
+    else if (v === 'c2-home')  root.innerHTML = renderC2Home();
+    else if (v === 'c2-jobs')  root.innerHTML = renderC2Jobs();
+    else if (v === 'c2-pick')  root.innerHTML = renderC2Pick();
+    else if (v === 'c2-done')  root.innerHTML = renderC2Done();
+    else if (v === 'c3-home')  root.innerHTML = renderC3Home();
+    else if (v === 'c3-check') root.innerHTML = renderC3Check();
+    else if (v === 'c3-done')  root.innerHTML = renderC3Done();
+    else if (v === 'c4-overview') root.innerHTML = renderC4Overview();
     bindEvents();
   }
 
@@ -628,7 +650,7 @@
   }
 
   /* ═══════════════════════════════════════════════
-     MODULE 1 — PICK VERIFIER (unchanged from v2.2.1)
+     MODULE 1 — PICK VERIFIER
   ═══════════════════════════════════════════════ */
   function renderUpload() {
     const driveStatusHtml = state.driveAuthed
@@ -793,6 +815,7 @@
     const s    = state.c2.session;
     const jobs = s.jobs || [];
     const jobRows = jobs.map(jobRef => {
+      /* Count items that appear on this specific job's packing slip */
       const items = s.masterList.filter(i => i.jobs && i.jobs.includes(jobRef));
       const picks = state.c2.picks[jobRef] || {};
       const entered = Object.values(picks).filter(p => p.qty !== null && p.qty !== undefined).length;
@@ -825,7 +848,10 @@
     const rows = items.map(item => {
       const p = picks[item.key];
       const val = (p && p.qty !== undefined && p.qty !== null) ? p.qty : '';
-      const needed = item.qty;
+      /* ── FIX: use per-job qty from packing slip, not consolidated total ── */
+      const needed = (item.jobQtys && item.jobQtys[jobRef] != null)
+        ? item.jobQtys[jobRef]
+        : item.qty;
       let rowClass = '', indColor = '', indChar = '';
       if (val !== '') {
         const n = Number(val);
@@ -865,12 +891,18 @@
     const jobRef = state.c2.selectedJob;
     const picks  = state.c2.picks[jobRef] || {};
     const items  = s.masterList.filter(i => i.jobs && i.jobs.includes(jobRef));
-    const shorts = items.filter(i => { const p = picks[i.key]; return p && p.qty !== null && Number(p.qty) < i.qty; });
+    const shorts = items.filter(i => {
+      const p = picks[i.key];
+      if (!p || p.qty === null || p.qty === undefined) return false;
+      const needed = (i.jobQtys && i.jobQtys[jobRef] != null) ? i.jobQtys[jobRef] : i.qty;
+      return Number(p.qty) < needed;
+    });
 
     const shortRows = shorts.map(item => {
       const p    = picks[item.key];
       const pQty = Number(p.qty);
-      return `<tr><td>${esc(item.name)}</td><td class="report-sku">${item.sku ? esc(item.sku) : '&mdash;'}</td><td>${item.qty}</td><td>${pQty}</td><td class="need">${item.qty - pQty}</td></tr>`;
+      const needed = (item.jobQtys && item.jobQtys[jobRef] != null) ? item.jobQtys[jobRef] : item.qty;
+      return `<tr><td>${esc(item.name)}</td><td class="report-sku">${item.sku ? esc(item.sku) : '&mdash;'}</td><td>${needed}</td><td>${pQty}</td><td class="need">${needed - pQty}</td></tr>`;
     }).join('');
 
     return `
@@ -1051,7 +1083,6 @@
     if (action === 'go-home') {
       state.module = 'home'; state.view = 'home';
       state.dash = { loading: true, m1: [], m2: [], m3: [] };
-      /* dashUnlocked is intentionally preserved — PIN entered once per session */
       state.c2 = { session: null, selectedJob: null, picks: {}, loading: false };
       state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null };
       render(); return;
@@ -1062,6 +1093,18 @@
     if (action === 'copy-dash-m2') { copyDashM2(); return; }
     if (action === 'copy-dash-m3') { copyDashM3(); return; }
     if (action === 'dash-unlock') { tryDashUnlock(); return; }
+
+    /* ── dashboard session expand/collapse ── */
+    if (action === 'dash-expand') {
+      const key = btn.dataset.key;
+      state.dashExpanded[key] = !state.dashExpanded[key];
+      /* toggle DOM directly to avoid full re-render */
+      const body = document.querySelector(`.dash-session-body[data-key="${key}"]`);
+      const chevron = document.querySelector(`.dash-session-chevron[data-key="${key}"]`);
+      if (body)    body.classList.toggle('open', state.dashExpanded[key]);
+      if (chevron) chevron.classList.toggle('open', state.dashExpanded[key]);
+      return;
+    }
 
     /* ── module 1 ── */
     if (action === 'browse-files') { document.getElementById('file-input').click(); return; }
@@ -1107,25 +1150,19 @@
   });
 
   /* ═══════════════════════════════════════════════
-     GLOBAL CHANGE HANDLER
+     GLOBAL CHANGE + KEYDOWN HANDLERS
   ═══════════════════════════════════════════════ */
   document.addEventListener('keydown', e => {
-    if (e.key === 'Enter' && e.target.id === 'dash-pin-input') {
-      e.preventDefault();
-      tryDashUnlock();
-    }
+    if (e.key === 'Enter' && e.target.id === 'dash-pin-input') { e.preventDefault(); tryDashUnlock(); }
   });
 
   document.addEventListener('change', e => {
-    /* M1 file input */
     if (e.target.id === 'file-input') { handleFiles([...e.target.files]); return; }
-    /* M1 partial qty */
     if (e.target.dataset.action === 'qty-input') {
       const key = e.target.dataset.key;
       if (state.checks[key]) { state.checks[key].haveQty = Number(e.target.value); pushCheck(key); }
       return;
     }
-    /* M2 pick qty */
     if (e.target.dataset.action === 'c2-qty') {
       const key    = e.target.dataset.key;
       const jobRef = state.c2.selectedJob;
@@ -1135,7 +1172,6 @@
       state.c2.picks[jobRef][key] = { qty: val === '' ? null : Number(val) };
       render(); return;
     }
-    /* M3 short qty */
     if (e.target.dataset.action === 'c3-qty') {
       const key = e.target.dataset.key;
       if (state.c3.delivered[key]) {
@@ -1146,7 +1182,7 @@
   });
 
   /* ═══════════════════════════════════════════════
-     GOOGLE DRIVE PICKER  (unchanged from v2.2.1)
+     GOOGLE DRIVE PICKER
   ═══════════════════════════════════════════════ */
   function loadPickerApi() {
     return new Promise(resolve => {
@@ -1215,7 +1251,7 @@
   }
 
   /* ═══════════════════════════════════════════════
-     FILE HANDLING + PDF PARSING  (unchanged from v2.2.1)
+     FILE HANDLING + PDF PARSING
   ═══════════════════════════════════════════════ */
   async function handleFiles(files) {
     if (!files.length) return;
@@ -1232,6 +1268,7 @@
     setProgress(90, 'Consolidating\u2026');
     const masterList = buildMasterList(jobObjs);
     setProgress(100, 'Done!');
+    /* All files go into ONE session — job ids collected from all parsed slips */
     const session = await createSession(masterList, jobObjs.map(j => j.id));
     state.session = session; state.checks = {}; state.view = 'session';
     setTimeout(() => render(), 400);
@@ -1314,20 +1351,37 @@
     return { id: jobId, name: jobId, filename, items };
   }
 
+  /* ── FIX: buildMasterList stores jobQtys so M2/M3 can show per-slip quantities ── */
   function buildMasterList(jobs) {
     const map = new Map();
     jobs.forEach(job => {
       job.items.forEach(item => {
         const key = item.sku ? item.sku.toUpperCase() : item.name.toLowerCase();
-        if (map.has(key)) { const ex = map.get(key); ex.qty += item.qty; if (!ex.jobs.includes(job.id)) ex.jobs.push(job.id); }
-        else map.set(key, { key, name: item.name, sku: item.sku || '', qty: item.qty, unit: item.unit, fromBundle: item.fromBundle || null, jobs: [job.id] });
+        if (map.has(key)) {
+          const ex = map.get(key);
+          ex.qty += item.qty;
+          if (!ex.jobs.includes(job.id)) ex.jobs.push(job.id);
+          /* accumulate per-job qty for M2/M3 — does not affect M1 consolidated qty */
+          ex.jobQtys[job.id] = (ex.jobQtys[job.id] || 0) + item.qty;
+        } else {
+          map.set(key, {
+            key,
+            name: item.name,
+            sku: item.sku || '',
+            qty: item.qty,
+            unit: item.unit,
+            fromBundle: item.fromBundle || null,
+            jobs: [job.id],
+            jobQtys: { [job.id]: item.qty },
+          });
+        }
       });
     });
     return [...map.values()].sort((a, b) => a.name.localeCompare(b.name));
   }
 
   /* ═══════════════════════════════════════════════
-     SUPABASE — M1 sessions & checks  (unchanged)
+     SUPABASE — M1 sessions & checks
   ═══════════════════════════════════════════════ */
   async function createSession(masterList, jobs) {
     const code = generateCode();
@@ -1338,9 +1392,6 @@
   }
 
   async function joinSession(code) {
-    /* code arrives already uppercased + dash-stripped from the click handler.
-       Try the normalised form first, then rebuild AB-YYMM-N dashes to match
-       old sessions stored with dashes (e.g. AB2606R → AB-2606-R). */
     const tryCode = async (c) => sb.from('sessions').select('*').eq('code', c).single();
     let { data, error } = await tryCode(code);
     if (error || !data) {
@@ -1397,7 +1448,7 @@
     const canvas = document.getElementById('snake-canvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const G = 24; // matches dot-grid spacing
+    const G = 24;
 
     canvas.width  = window.innerWidth;
     canvas.height = window.innerHeight;
@@ -1405,15 +1456,14 @@
     const cols = Math.ceil(canvas.width  / G) + 1;
     const rows = Math.ceil(canvas.height / G) + 1;
 
-    /* start in the middle heading right */
     const mx = Math.floor(cols / 2);
     const my = Math.floor(rows / 2);
     let body = Array.from({ length: 10 }, (_, i) => ({ x: mx - i, y: my }));
     let vx = 1, vy = 0;
-    let pending = 0; /* segments queued to add */
+    let pending = 0;
 
     let lastStep = 0, lastTurn = 0;
-    const STEP   = 280; /* ms per cell — slow and atmospheric */
+    const STEP   = 280;
     let nextTurn = 1800 + Math.random() * 2000;
 
     function wrap(v, max) { return ((v % max) + max) % max; }
@@ -1421,17 +1471,14 @@
     function loop(now) {
       if (!document.getElementById('snake-canvas')) { snakeAnimId = null; return; }
 
-      /* move */
       if (now - lastStep >= STEP) {
         lastStep = now;
         const h = body[0];
         body.unshift({ x: wrap(h.x + vx, cols), y: wrap(h.y + vy, rows) });
         if (pending > 0) { pending--; } else { body.pop(); }
-        /* grow occasionally, cap at 40 */
         if (body.length < 40 && Math.random() < 0.06) pending += 2;
       }
 
-      /* turn */
       if (now - lastTurn >= nextTurn) {
         lastTurn   = now;
         nextTurn   = 1500 + Math.random() * 2200;
@@ -1440,7 +1487,6 @@
         [vx, vy]   = opts[Math.floor(Math.random() * opts.length)];
       }
 
-      /* draw */
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       body.forEach((seg, i) => {
         const fade  = 1 - i / body.length;
@@ -1499,7 +1545,7 @@
       loadDashboard();
     } else {
       const err = document.getElementById('dash-pin-error');
-      if (err) err.textContent = 'Incorrect PIN — try again';
+      if (err) err.textContent = 'Incorrect PIN \u2014 try again';
       input.value = '';
       input.focus();
     }
@@ -1509,15 +1555,12 @@
     const el = document.getElementById('dashboard');
     if (!el) return;
     try {
-      /* M2 — pick shortfalls */
       const { data: picks } = await sb.from('pick_completions')
         .select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200);
 
-      /* M3 — remedial deliveries */
       const { data: delivs } = await sb.from('deliveries')
         .select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200);
 
-      /* M1 — purchasing shortfalls: load recent short checks + their sessions */
       const { data: shortChecks } = await sb.from('checks')
         .select('*').in('status', ['short', 'part'])
         .order('updated_at', { ascending: false }).limit(300);
@@ -1540,7 +1583,6 @@
         });
       }
 
-      /* Group M2 by job */
       const m2Map = new Map();
       (picks || []).forEach(r => {
         const job = displayJobRef(r.job_ref) || r.job_ref;
@@ -1548,7 +1590,6 @@
         m2Map.get(job).push(r);
       });
 
-      /* Group M3 by job */
       const m3Map = new Map();
       (delivs || []).forEach(r => {
         const job = displayJobRef(r.job_ref) || r.job_ref;
@@ -1556,12 +1597,7 @@
         m3Map.get(job).push(r);
       });
 
-      state.dash = {
-        loading: false,
-        m1,
-        m2: [...m2Map.entries()],
-        m3: [...m3Map.entries()],
-      };
+      state.dash = { loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()] };
       el.innerHTML = renderDashboardContent();
     } catch (err) {
       console.error('Dashboard error:', err);
@@ -1583,96 +1619,108 @@
       </div>`;
     }
 
-    /* ── M1 ── */
+    /* ── M1: expandable per-session ── */
     let m1Html = '';
     if (m1Count) {
-      const MAX = 5;
-      let rows = '', shown = 0;
-      m1.forEach(({ code, items }) => {
-        rows += `<div class="dash-job-label">Session ${esc(code)}</div>`;
-        items.slice(0, Math.max(0, MAX - shown)).forEach(i => {
-          rows += `<div class="dash-item">
+      const sessionBlocks = m1.map(({ code, items }) => {
+        const isOpen = !!state.dashExpanded[code];
+        const itemRows = items.map(i => `
+          <div class="dash-item">
             <div class="dash-item-name">${esc(i.name)}</div>
             ${i.sku ? `<span class="dash-item-detail">${esc(i.sku)}</span>` : ''}
             <span class="dash-item-short">Need ${i.toOrder}</span>
+          </div>`).join('');
+        return `
+          <div class="dash-session">
+            <div class="dash-session-head" data-action="dash-expand" data-key="${esc(code)}">
+              <div class="dash-session-code">Session ${esc(code)}</div>
+              <div class="dash-session-meta">${items.length} item${items.length !== 1 ? 's' : ''}</div>
+              <div class="dash-session-chevron ${isOpen ? 'open' : ''}" data-key="${esc(code)}">&#9658;</div>
+            </div>
+            <div class="dash-session-body ${isOpen ? 'open' : ''}" data-key="${esc(code)}">${itemRows}</div>
           </div>`;
-        });
-        shown += items.length;
-      });
-      const extra = m1Count - Math.min(m1Count, MAX);
+      }).join('');
+
       m1Html = `<div class="dash-section">
         <div class="dash-section-head">
           <div class="dash-stripe" style="background:#0075ab;"></div>
           <div class="dash-section-title">01 &nbsp;Purchasing shortfalls</div>
           <span class="dash-count">${m1Count} item${m1Count !== 1 ? 's' : ''}</span>
         </div>
-        <div class="dash-job-group">${rows}</div>
-        ${extra > 0 ? `<div class="dash-more">+${extra} more items</div>` : ''}
+        ${sessionBlocks}
         <div class="dash-footer">
           <button class="btn btn-ghost" data-action="copy-dash-m1" style="font-size:.8rem;padding:6px 14px;">&#128203; Copy purchasing list</button>
         </div>
       </div>`;
     }
 
-    /* ── M2 ── */
+    /* ── M2: expandable per-job ── */
     let m2Html = '';
     if (m2Count) {
-      const MAX = 6;
-      let rows = '', shown = 0;
-      m2.forEach(([job, items]) => {
-        if (shown >= MAX) return;
-        rows += `<div class="dash-job-label">Job ${esc(job)}</div>`;
-        items.slice(0, Math.max(0, MAX - shown)).forEach(i => {
-          rows += `<div class="dash-item">
+      const jobBlocks = m2.map(([job, items]) => {
+        const key = 'm2-' + job;
+        const isOpen = !!state.dashExpanded[key];
+        const itemRows = items.map(i => `
+          <div class="dash-item">
             <div class="dash-item-name">${esc(i.item_name)}</div>
             <span class="dash-item-detail">Needed ${i.needed_qty} &middot; Picked ${i.picked_qty}</span>
             <span class="dash-item-short">Short ${i.shortfall}</span>
+          </div>`).join('');
+        return `
+          <div class="dash-session">
+            <div class="dash-session-head" data-action="dash-expand" data-key="${esc(key)}">
+              <div class="dash-session-code">Job ${esc(job)}</div>
+              <div class="dash-session-meta">${items.length} item${items.length !== 1 ? 's' : ''}</div>
+              <div class="dash-session-chevron ${isOpen ? 'open' : ''}" data-key="${esc(key)}">&#9658;</div>
+            </div>
+            <div class="dash-session-body ${isOpen ? 'open' : ''}" data-key="${esc(key)}">${itemRows}</div>
           </div>`;
-        });
-        shown += items.length;
-      });
-      const extra = m2Count - Math.min(m2Count, MAX);
+      }).join('');
+
       m2Html = `<div class="dash-section">
         <div class="dash-section-head">
           <div class="dash-stripe" style="background:#059669;"></div>
           <div class="dash-section-title">02 &nbsp;Pick shortfalls</div>
           <span class="dash-count">${m2Count} item${m2Count !== 1 ? 's' : ''}</span>
         </div>
-        <div class="dash-job-group">${rows}</div>
-        ${extra > 0 ? `<div class="dash-more">+${extra} more items</div>` : ''}
+        ${jobBlocks}
         <div class="dash-footer">
           <button class="btn btn-ghost" data-action="copy-dash-m2" style="font-size:.8rem;padding:6px 14px;">&#128203; Copy pick shortfalls</button>
         </div>
       </div>`;
     }
 
-    /* ── M3 ── */
+    /* ── M3: expandable per-job ── */
     let m3Html = '';
     if (m3Count) {
-      const MAX = 6;
-      let rows = '', shown = 0;
-      m3.forEach(([job, items]) => {
-        if (shown >= MAX) return;
-        const driver = items[0]?.driver_name ? ` &middot; Driver: ${esc(items[0].driver_name)}` : '';
-        rows += `<div class="dash-job-label">Job ${esc(job)}${driver}</div>`;
-        items.slice(0, Math.max(0, MAX - shown)).forEach(i => {
-          rows += `<div class="dash-item">
+      const jobBlocks = m3.map(([job, items]) => {
+        const key = 'm3-' + job;
+        const isOpen = !!state.dashExpanded[key];
+        const driver = items[0]?.driver_name ? ` &middot; ${esc(items[0].driver_name)}` : '';
+        const itemRows = items.map(i => `
+          <div class="dash-item">
             <div class="dash-item-name">${esc(i.item_name)}</div>
             <span class="dash-item-detail">Expected ${i.picked_qty} &middot; Delivered ${i.delivered_qty}</span>
             <span class="dash-item-short">Short ${i.shortfall}</span>
+          </div>`).join('');
+        return `
+          <div class="dash-session">
+            <div class="dash-session-head" data-action="dash-expand" data-key="${esc(key)}">
+              <div class="dash-session-code">Job ${esc(job)}${driver}</div>
+              <div class="dash-session-meta">${items.length} item${items.length !== 1 ? 's' : ''}</div>
+              <div class="dash-session-chevron ${isOpen ? 'open' : ''}" data-key="${esc(key)}">&#9658;</div>
+            </div>
+            <div class="dash-session-body ${isOpen ? 'open' : ''}" data-key="${esc(key)}">${itemRows}</div>
           </div>`;
-        });
-        shown += items.length;
-      });
-      const extra = m3Count - Math.min(m3Count, MAX);
+      }).join('');
+
       m3Html = `<div class="dash-section">
         <div class="dash-section-head">
           <div class="dash-stripe" style="background:#ea580c;"></div>
           <div class="dash-section-title">03 &nbsp;Remedial deliveries needed</div>
           <span class="dash-count">${m3Count} item${m3Count !== 1 ? 's' : ''}</span>
         </div>
-        <div class="dash-job-group">${rows}</div>
-        ${extra > 0 ? `<div class="dash-more">+${extra} more items</div>` : ''}
+        ${jobBlocks}
         <div class="dash-footer">
           <button class="btn btn-ghost" data-action="copy-dash-m3" style="font-size:.8rem;padding:6px 14px;">&#128203; Copy remedial list</button>
         </div>
@@ -1685,7 +1733,7 @@
   /* ── Dashboard copy functions ── */
   function copyDashM1() {
     const { m1 } = state.dash;
-    if (!m1.length) { toast('Nothing to copy'); return; }
+    if (!m1 || !m1.length) { toast('Nothing to copy'); return; }
     const lines = ['ANNICK BATHROOMS \u2014 PURCHASING SHORTFALLS',
       `Generated: ${new Date().toLocaleString('en-GB')}`, ''];
     m1.forEach(({ code, items }) => {
@@ -1698,7 +1746,7 @@
 
   function copyDashM2() {
     const { m2 } = state.dash;
-    if (!m2.length) { toast('Nothing to copy'); return; }
+    if (!m2 || !m2.length) { toast('Nothing to copy'); return; }
     const lines = ['ANNICK BATHROOMS \u2014 PICK SHORTFALLS',
       `Generated: ${new Date().toLocaleString('en-GB')}`, ''];
     m2.forEach(([job, items]) => {
@@ -1711,7 +1759,7 @@
 
   function copyDashM3() {
     const { m3 } = state.dash;
-    if (!m3.length) { toast('Nothing to copy'); return; }
+    if (!m3 || !m3.length) { toast('Nothing to copy'); return; }
     const lines = ['ANNICK BATHROOMS \u2014 REMEDIAL DELIVERIES REQUIRED',
       `Generated: ${new Date().toLocaleString('en-GB')}`, ''];
     m3.forEach(([job, items]) => {
@@ -1726,10 +1774,6 @@
   /* ═══════════════════════════════════════════════
      SUPABASE — M2 pick completion
   ═══════════════════════════════════════════════ */
-
-  /* Normalise a job ref that may be a plain string or a full job object.
-     Older sessions stored line-item objects {qty, jobName, lineNum, filename}
-     rather than simple ID strings — extract the meaningful identifier. */
   function normJobRef(j) {
     if (typeof j === 'string' && j.length) return j;
     if (j && typeof j === 'object') {
@@ -1740,9 +1784,6 @@
     return String(j);
   }
 
-  /* Return a clean label for a job ref string. Strips trailing descriptive
-     words from filenames like "1659 packing slip 24_5_26" so the list shows
-     "1659". Leaves tidy refs like "Q1785" unchanged. */
   function displayJobRef(ref) {
     if (!ref) return ref;
     const stripped = ref.replace(/^Q/i, '');
@@ -1764,21 +1805,17 @@
     }
     state.c2.loading = false;
     if (error || !data) { toast('Session not found \u2014 check the code'); render(); return; }
-    /* Normalise masterList item job refs to plain strings (handles old sessions
-       where item.jobs may contain objects instead of string IDs). */
     const masterList = (data.master_list || []).map(item => ({
       ...item,
       jobs: (item.jobs || []).map(normJobRef),
+      /* preserve jobQtys if stored, otherwise fall back gracefully */
+      jobQtys: item.jobQtys || {},
     }));
-    /* Derive the job list from masterList items — more reliable than sessions.jobs
-       which may contain full objects depending on which app version created the session. */
     const jobSet = new Set();
     masterList.forEach(item => (item.jobs || []).forEach(j => jobSet.add(j)));
-    /* Fall back to sessions.jobs (normalised) if no jobs found in items */
     if (jobSet.size === 0) (data.jobs || []).forEach(j => jobSet.add(normJobRef(j)));
     const jobs = [...jobSet].sort();
     state.c2.session = { id: data.id, code: data.code, masterList, jobs };
-    /* load any picks already saved for this session */
     const { data: existing } = await sb.from('pick_completions').select('*').eq('session_id', data.id);
     if (existing && existing.length) {
       existing.forEach(row => {
@@ -1798,15 +1835,19 @@
     const items  = s.masterList.filter(i => i.jobs && i.jobs.includes(jobRef));
 
     const rows = items.map(item => {
-      const p          = picks[item.key];
-      const pickedQty  = (p && p.qty !== null && p.qty !== undefined) ? Number(p.qty) : item.qty;
-      const shortfall  = Math.max(0, item.qty - pickedQty);
+      const p = picks[item.key];
+      /* ── FIX: use per-job qty as the baseline for shortfall calc ── */
+      const neededQty = (item.jobQtys && item.jobQtys[jobRef] != null)
+        ? item.jobQtys[jobRef]
+        : item.qty;
+      const pickedQty = (p && p.qty !== null && p.qty !== undefined) ? Number(p.qty) : neededQty;
+      const shortfall  = Math.max(0, neededQty - pickedQty);
       return {
         session_id:   s.id,
         job_ref:      jobRef,
         item_key:     item.key,
         item_name:    item.name,
-        needed_qty:   item.qty,
+        needed_qty:   neededQty,
         picked_qty:   pickedQty,
         shortfall,
         updated_at:   new Date().toISOString(),
@@ -1816,7 +1857,6 @@
     const { error } = await sb.from('pick_completions').insert(rows);
     if (error) { console.error(error); toast('Could not save \u2014 check your connection'); return; }
 
-    /* update local state with the resolved qtys */
     if (!state.c2.picks[jobRef]) state.c2.picks[jobRef] = {};
     rows.forEach(r => { state.c2.picks[jobRef][r.item_key] = { qty: r.picked_qty }; });
 
@@ -1828,14 +1868,23 @@
     const jobRef = state.c2.selectedJob;
     const picks  = state.c2.picks[jobRef] || {};
     const items  = s.masterList.filter(i => i.jobs && i.jobs.includes(jobRef));
-    const shorts = items.filter(i => { const p = picks[i.key]; return p && p.qty !== null && Number(p.qty) < i.qty; });
+    const shorts = items.filter(i => {
+      const p = picks[i.key];
+      if (!p || p.qty === null || p.qty === undefined) return false;
+      const needed = (i.jobQtys && i.jobQtys[jobRef] != null) ? i.jobQtys[jobRef] : i.qty;
+      return Number(p.qty) < needed;
+    });
     if (!shorts.length) { toast('Nothing short'); return; }
     const lines = [
       'ANNICK BATHROOMS \u2014 PICK SHORTFALL',
       `Session: ${s.code}  Job: ${jobRef}`,
       `Generated: ${new Date().toLocaleString('en-GB')}`, '',
       'Item | SKU | Needed | Picked | Short', '\u2500'.repeat(60),
-      ...shorts.map(i => { const p = picks[i.key]; return `${i.name} | ${i.sku || ''} | ${i.qty} | ${p.qty} | ${i.qty - Number(p.qty)}`; }),
+      ...shorts.map(i => {
+        const p = picks[i.key];
+        const needed = (i.jobQtys && i.jobQtys[jobRef] != null) ? i.jobQtys[jobRef] : i.qty;
+        return `${i.name} | ${i.sku || ''} | ${needed} | ${p.qty} | ${needed - Number(p.qty)}`;
+      }),
     ];
     navigator.clipboard.writeText(lines.join('\n')).then(() => toast('Shortfall copied!'));
   }
@@ -1849,15 +1898,11 @@
     if (!jobEl) return;
     const raw = jobEl.value.trim();
     if (!raw) { toast('Enter a job reference'); return; }
-    /* Strip Q prefix and non-digits for comparison — "Q1659", "1659" and
-       "1659 packing slip 24_5_26" all resolve to "1659" via displayJobRef. */
     const jobNum = displayJobRef(raw.replace(/^Q/i, '').trim()) || raw.trim();
     state.c3.jobRef     = jobNum;
     state.c3.driverName = driverEl ? driverEl.value.trim() : '';
     state.c3.loading    = true; render();
 
-    /* Check pick_completions first — search for any job_ref whose display
-       form matches the entered number (handles "Q1659", "1659 packing slip…" etc) */
     const { data: allPicks } = await sb.from('pick_completions').select('*')
       .order('updated_at', { ascending: false }).limit(500);
     const pickData = (allPicks || []).filter(r => displayJobRef(r.job_ref) === jobNum);
@@ -1870,8 +1915,6 @@
       state.c3.items   = [...seen.values()].map(r => ({ key: r.item_key, name: r.item_name, sku: '', qty: r.picked_qty, unit: 'pcs', jobs: [jobNum] }));
       state.c3.session = null;
     } else {
-      /* Fall back to session master_list — match on displayJobRef so "1659"
-         matches both "Q1659" and "1659 packing slip 24_5_26" */
       const { data: sessions } = await sb.from('sessions').select('*').order('created_at', { ascending: false }).limit(30);
       const matched = (sessions || []).find(s =>
         (s.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum) ||
@@ -1883,8 +1926,15 @@
         render(); return;
       }
       state.c3.session = matched;
-      state.c3.items   = (matched.master_list || [])
-        .filter(i => (i.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum));
+      /* use per-job qty when available */
+      state.c3.items = (matched.master_list || [])
+        .filter(i => (i.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum))
+        .map(i => ({
+          ...i,
+          qty: (i.jobQtys && i.jobQtys[jobNum] != null) ? i.jobQtys[jobNum]
+             : (i.jobQtys && i.jobQtys['Q' + jobNum] != null) ? i.jobQtys['Q' + jobNum]
+             : i.qty,
+        }));
       if (!state.c3.items.length) { state.c3.loading = false; toast('No items found for job ' + jobNum); render(); return; }
     }
 
@@ -1922,7 +1972,7 @@
   }
 
   /* ═══════════════════════════════════════════════
-     M1 REPORT — copy to clipboard  (unchanged)
+     M1 REPORT — copy to clipboard
   ═══════════════════════════════════════════════ */
   function copyReport() {
     const items  = state.session.masterList;
