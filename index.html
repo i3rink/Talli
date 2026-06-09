@@ -287,7 +287,8 @@
 
     .lp-name { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1rem; font-weight: 700; color: var(--text); line-height: 1.2; }
     .lp-desc { font-size: .78rem; color: var(--muted); line-height: 1.4; }
-    .lp-glyph { font-size: 1.6rem; position: absolute; top: 14px; right: 16px; opacity: .12; line-height: 1; }
+    .lp-glyph { position: absolute; top: 14px; right: 16px; opacity: .22; line-height: 1; display: block; }
+    .lp-glyph svg { display: block; }
 
     .lp-badge { display: inline-block; font-size: .65rem; font-weight: 700; background: #ede9fe; color: #7c3aed; border-radius: 20px; padding: 2px 8px; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 2px; }
 
@@ -512,6 +513,8 @@
     dashUnlocked: false,
   };
 
+  let snakeAnimId = null;
+
   /* ═══════════════════════════════════════════════
      PDF.js
   ═══════════════════════════════════════════════ */
@@ -574,9 +577,16 @@
   function renderHome() {
     const h = new Date().getHours();
     const greet = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
-    /* Trigger dashboard load after this render cycle — only if unlocked */
     if (state.dashUnlocked) setTimeout(loadDashboard, 0);
+    setTimeout(startSnake, 80);
+    const ic = {
+      list: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><line x1="12" x2="16" y1="11" y2="11"/><line x1="8" x2="8.01" y1="11" y2="11"/><line x1="12" x2="16" y1="16" y2="16"/><line x1="8" x2="8.01" y1="16" y2="16"/></svg>`,
+      check:`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>`,
+      truck:`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>`,
+      pkg:  `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/></svg>`,
+    };
     return `
+      <canvas id="snake-canvas" style="position:fixed;inset:0;pointer-events:none;z-index:-1;"></canvas>
       <div class="lp-intro">
         <h1>Good ${greet}.</h1>
         <div class="text-muted text-sm">Pick a module to get started.</div>
@@ -586,26 +596,26 @@
           <span class="lp-num">01</span>
           <span class="lp-name">Pick Verifier</span>
           <span class="lp-desc">Parse packing slips, build the pick list, check stock.</span>
-          <span class="lp-glyph">&#10003;</span>
+          <span class="lp-glyph" style="color:#0075ab;">${ic.list}</span>
         </button>
         <button class="lp-card c-green" data-action="open-module" data-mod="completion">
           <span class="lp-num">02</span>
           <span class="lp-name">Pick Completion</span>
           <span class="lp-desc">Mark jobs as picked, flag shortfalls to purchasing.</span>
-          <span class="lp-glyph">&#9633;</span>
+          <span class="lp-glyph" style="color:#059669;">${ic.check}</span>
         </button>
         <button class="lp-card c-orange" data-action="open-module" data-mod="delivery">
           <span class="lp-num">03</span>
           <span class="lp-name">Driver Delivery</span>
           <span class="lp-desc">Enter a job, tick off what landed on site.</span>
-          <span class="lp-glyph">&#9654;</span>
+          <span class="lp-glyph" style="color:#ea580c;">${ic.truck}</span>
         </button>
         <button class="lp-card c-purple" data-action="open-module" data-mod="stock">
           <span class="lp-badge">Coming soon</span>
           <span class="lp-num">04</span>
           <span class="lp-name">Stock Checker</span>
           <span class="lp-desc">Physical counts by category, variance review, audit trail.</span>
-          <span class="lp-glyph">&#9632;</span>
+          <span class="lp-glyph" style="color:#7c3aed;">${ic.pkg}</span>
         </button>
       </div>
       <div class="dash-wrap">
@@ -1029,6 +1039,7 @@
 
     /* ── navigation ── */
     if (action === 'open-module') {
+      stopSnake();
       const mod = btn.dataset.mod;
       state.module = mod;
       if (mod === 'verifier')   { state.view = 'upload'; }
@@ -1379,6 +1390,81 @@
   }
 
   /* ═══════════════════════════════════════════════
+     SNAKE BACKGROUND ANIMATION
+  ═══════════════════════════════════════════════ */
+  function startSnake() {
+    stopSnake();
+    const canvas = document.getElementById('snake-canvas');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    const G = 24; // matches dot-grid spacing
+
+    canvas.width  = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const cols = Math.ceil(canvas.width  / G) + 1;
+    const rows = Math.ceil(canvas.height / G) + 1;
+
+    /* start in the middle heading right */
+    const mx = Math.floor(cols / 2);
+    const my = Math.floor(rows / 2);
+    let body = Array.from({ length: 10 }, (_, i) => ({ x: mx - i, y: my }));
+    let vx = 1, vy = 0;
+    let pending = 0; /* segments queued to add */
+
+    let lastStep = 0, lastTurn = 0;
+    const STEP   = 280; /* ms per cell — slow and atmospheric */
+    let nextTurn = 1800 + Math.random() * 2000;
+
+    function wrap(v, max) { return ((v % max) + max) % max; }
+
+    function loop(now) {
+      if (!document.getElementById('snake-canvas')) { snakeAnimId = null; return; }
+
+      /* move */
+      if (now - lastStep >= STEP) {
+        lastStep = now;
+        const h = body[0];
+        body.unshift({ x: wrap(h.x + vx, cols), y: wrap(h.y + vy, rows) });
+        if (pending > 0) { pending--; } else { body.pop(); }
+        /* grow occasionally, cap at 40 */
+        if (body.length < 40 && Math.random() < 0.06) pending += 2;
+      }
+
+      /* turn */
+      if (now - lastTurn >= nextTurn) {
+        lastTurn   = now;
+        nextTurn   = 1500 + Math.random() * 2200;
+        const opts = [[1,0],[-1,0],[0,1],[0,-1]]
+          .filter(([dx,dy]) => !(dx === -vx && dy === -vy));
+        [vx, vy]   = opts[Math.floor(Math.random() * opts.length)];
+      }
+
+      /* draw */
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      body.forEach((seg, i) => {
+        const fade  = 1 - i / body.length;
+        const alpha = fade * 0.52 + 0.04;
+        const r     = i === 0 ? 5 : 3.5;
+        ctx.beginPath();
+        ctx.arc(seg.x * G, seg.y * G, r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(100,116,139,${alpha.toFixed(2)})`;
+        ctx.fill();
+      });
+
+      snakeAnimId = requestAnimationFrame(loop);
+    }
+
+    snakeAnimId = requestAnimationFrame(loop);
+  }
+
+  function stopSnake() {
+    if (snakeAnimId) { cancelAnimationFrame(snakeAnimId); snakeAnimId = null; }
+    const c = document.getElementById('snake-canvas');
+    if (c) c.getContext('2d').clearRect(0, 0, c.width, c.height);
+  }
+
+  /* ═══════════════════════════════════════════════
      HOME DASHBOARD
   ═══════════════════════════════════════════════ */
   const DASH_PIN = '1690';
@@ -1508,7 +1594,7 @@
           rows += `<div class="dash-item">
             <div class="dash-item-name">${esc(i.name)}</div>
             ${i.sku ? `<span class="dash-item-detail">${esc(i.sku)}</span>` : ''}
-            <span class="dash-item-short">Order ${i.toOrder}</span>
+            <span class="dash-item-short">Need ${i.toOrder}</span>
           </div>`;
         });
         shown += items.length;
@@ -1604,7 +1690,7 @@
       `Generated: ${new Date().toLocaleString('en-GB')}`, ''];
     m1.forEach(({ code, items }) => {
       lines.push(`Session: ${code}`);
-      items.forEach(i => lines.push(`  ${i.name}${i.sku ? ' (' + i.sku + ')' : ''} \u2014 Order ${i.toOrder}`));
+      items.forEach(i => lines.push(`  ${i.name}${i.sku ? ' (' + i.sku + ')' : ''} \u2014 Need ${i.toOrder}`));
       lines.push('');
     });
     navigator.clipboard.writeText(lines.join('\n')).then(() => toast('Purchasing list copied!'));
