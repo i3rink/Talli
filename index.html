@@ -24,7 +24,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
-    /* ── Version: 2.3.1 ── */
+    /* ── Version: 2.3.3 ── */
 
     :root {
       --teal:        #0075ab;
@@ -454,7 +454,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span id="header-sub">v2.3.1</span>
+      <span id="header-sub">v2.3.3</span>
     </div>
   </div>
 
@@ -492,7 +492,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
   const MODULE_LABELS = {
-    home: 'v2.3.1',
+    home: 'v2.3.3',
     verifier: 'Pick Verifier',
     completion: 'Pick Completion',
     delivery: 'Driver Delivery',
@@ -527,6 +527,7 @@
     driveAuthed:     false,
     driveToken:      null,
     pickerApiLoaded: false,
+    stagedFiles:     [],   /* files queued before session creation */
     /* module 2 — pick completion */
     c2: { session: null, selectedJob: null, picks: {}, loading: false },
     /* module 3 — driver delivery */
@@ -656,25 +657,54 @@
     const driveStatusHtml = state.driveAuthed
       ? `<div class="drive-status authed"><span class="dot"></span>Connected to Google Drive</div>`
       : `<div class="drive-status"><span class="dot"></span>Not connected to Google Drive</div>`;
+
+    const staged = state.stagedFiles;
+    const stagedHtml = staged.length ? `
+      <div style="margin-top:16px;">
+        <div style="font-family:'Bricolage Grotesque',sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px;">
+          ${staged.length} file${staged.length !== 1 ? 's' : ''} queued
+        </div>
+        <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:14px;">
+          ${staged.map((f, idx) => `
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--bg);border:1px solid var(--border);border-radius:7px;font-size:.84rem;">
+              <span>&#128196;</span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(f.name)}</span>
+              <button class="btn btn-ghost" data-action="stage-remove" data-idx="${idx}"
+                style="padding:2px 8px;font-size:.78rem;flex-shrink:0;">&#10005;</button>
+            </div>`).join('')}
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button class="btn btn-drive" data-action="drive-pick">${driveIcon()} Add more from Drive</button>
+          <button class="btn btn-ghost" data-action="browse-files">&#128196; Add more files</button>
+          <button class="btn btn-primary" data-action="stage-create" style="margin-left:auto;">
+            Create Session &#8594;
+          </button>
+        </div>
+        <div id="parse-progress" style="display:none;margin-top:14px;">
+          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+          <p class="text-muted text-sm" id="progress-label">Parsing PDFs&#8230;</p>
+        </div>
+      </div>` : `
+      <div class="upload-zone" id="drop-zone">
+        <p><strong>Upload Packing Slips</strong>Drag &amp; drop PDF files here, or use the buttons below</p>
+        <div class="upload-btns">
+          <button class="btn btn-primary" data-action="browse-files">&#128196; Choose Files</button>
+          <button class="btn btn-drive" data-action="drive-pick">${driveIcon()} Upload from Google Drive</button>
+        </div>
+        ${driveStatusHtml}
+      </div>
+      <div id="parse-progress" style="display:none;margin-top:14px;">
+        <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
+        <p class="text-muted text-sm" id="progress-label">Parsing PDFs&#8230;</p>
+      </div>`;
+
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
       <div class="card">
         <div class="card-title">New Stock Check Session</div>
-        <div class="upload-zone" id="drop-zone">
-          <p><strong>Upload Packing Slips</strong>Drag &amp; drop PDF files here, or use the buttons below</p>
-          <div class="upload-btns">
-            <button class="btn btn-primary" data-action="browse-files">&#128196; Choose Files</button>
-            <button class="btn btn-drive" data-action="drive-pick">${driveIcon()} Upload from Google Drive</button>
-          </div>
-          ${driveStatusHtml}
-        </div>
-        <input type="file" id="file-input" accept="application/pdf" multiple />
-        <div id="file-list" class="mt-4"></div>
-        <div id="parse-progress" style="display:none" class="mt-4">
-          <div class="progress-bar-wrap"><div class="progress-bar-fill" id="progress-fill" style="width:0%"></div></div>
-          <p class="text-muted text-sm" id="progress-label">Parsing PDFs&#8230;</p>
-        </div>
+        ${stagedHtml}
       </div>
+      <input type="file" id="file-input" accept="application/pdf" multiple />
       <div class="card">
         <div class="card-title">Join a Session (Warehouse)</div>
         <div class="flex gap-2 flex-wrap items-center">
@@ -1109,6 +1139,12 @@
     /* ── module 1 ── */
     if (action === 'browse-files') { document.getElementById('file-input').click(); return; }
     if (action === 'drive-pick')   { handleDrivePick(); return; }
+    if (action === 'stage-remove') {
+      const idx = parseInt(btn.dataset.idx, 10);
+      state.stagedFiles.splice(idx, 1);
+      render(); return;
+    }
+    if (action === 'stage-create') { processStaged(); return; }
     if (action === 'join-session') {
       const raw = document.getElementById('join-code').value.trim();
       const code = raw.toUpperCase().replace(/[\s\-]/g, '');
@@ -1118,7 +1154,7 @@
     if (action === 'go-check')    { state.view = 'check';  render(); return; }
     if (action === 'go-report')   { state.view = 'report'; render(); return; }
     if (action === 'back-upload') { state.view = 'upload'; render(); return; }
-    if (action === 'new-session') { state.session = null; state.checks = {}; state.view = 'upload'; render(); return; }
+    if (action === 'new-session') { state.session = null; state.checks = {}; state.stagedFiles = []; state.view = 'upload'; render(); return; }
     if (action === 'tab')         { state.tab = btn.dataset.tab; render(); return; }
     if (action === 'set-status')  { setStatus(btn.dataset.key, btn.dataset.status); return; }
     if (action === 'copy-report') { copyReport(); return; }
@@ -1200,7 +1236,9 @@
         callback: resp => {
           if (resp.error) { reject(resp.error); return; }
           state.driveToken = resp.access_token; state.driveAuthed = true;
-          render(); resolve(resp.access_token);
+          /* do NOT render() here — it wipes the DOM mid-flow on mobile
+             before the picker can open. Status dot updates on next natural render. */
+          resolve(resp.access_token);
         },
       });
       tokenClient.requestAccessToken({ prompt: state.driveAuthed ? '' : 'consent' });
@@ -1253,10 +1291,21 @@
   /* ═══════════════════════════════════════════════
      FILE HANDLING + PDF PARSING
   ═══════════════════════════════════════════════ */
+  /* handleFiles — adds incoming files to the staging queue, deduplicating by name.
+     Nothing is parsed or submitted until the user hits "Create Session". */
   async function handleFiles(files) {
     if (!files.length) return;
-    const listEl = document.getElementById('file-list');
-    if (listEl) listEl.innerHTML = files.map(f => `<div class="flex gap-2 items-center text-sm mt-2"><span>&#128196;</span><span>${esc(f.name)}</span></div>`).join('');
+    const existing = new Set(state.stagedFiles.map(f => f.name));
+    for (const f of files) {
+      if (!existing.has(f.name)) { state.stagedFiles.push(f); existing.add(f.name); }
+    }
+    render();
+  }
+
+  /* processStaged — parse all staged files and create a single session. */
+  async function processStaged() {
+    const files = state.stagedFiles;
+    if (!files.length) { toast('No files queued'); return; }
     const prog = document.getElementById('parse-progress');
     if (prog) prog.style.display = '';
     const jobObjs = [];
@@ -1268,9 +1317,10 @@
     setProgress(90, 'Consolidating\u2026');
     const masterList = buildMasterList(jobObjs);
     setProgress(100, 'Done!');
-    /* All files go into ONE session — job ids collected from all parsed slips */
     const session = await createSession(masterList, jobObjs.map(j => j.id));
-    state.session = session; state.checks = {}; state.view = 'session';
+    state.session = session; state.checks = {};
+    state.stagedFiles = [];   /* clear queue */
+    state.view = 'session';
     setTimeout(() => render(), 400);
   }
 
