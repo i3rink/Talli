@@ -24,7 +24,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
-    /* ── Version: 2.3.4 ── */
+    /* ── Version: 2.3.5 ── */
 
     :root {
       --teal:        #0075ab;
@@ -454,7 +454,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span id="header-sub">v2.3.4</span>
+      <span id="header-sub">v2.3.5</span>
     </div>
   </div>
 
@@ -492,7 +492,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
   const MODULE_LABELS = {
-    home: 'v2.3.4',
+    home: 'v2.3.5',
     verifier: 'Pick Verifier',
     completion: 'Pick Completion',
     delivery: 'Driver Delivery',
@@ -884,7 +884,7 @@
       const catItems = buckets[cat];
       if (!catItems.length) return '';
       const catDone = catItems.filter(i => checks[i.key]?.status).length;
-      const isOpen  = state.catExpanded?.[cat] !== false; /* open by default */
+      const isOpen  = state.catExpanded?.[cat] === true; /* collapsed by default */
       const colour  = catColours[cat];
       const rows    = catItems.map(i => renderItemRow(i, checks)).join('');
       return `
@@ -1292,11 +1292,11 @@
       const cat = btn.dataset.cat;
       if (!state.catExpanded) state.catExpanded = {};
       /* default is open (undefined = open), so toggle to explicit false/true */
-      state.catExpanded[cat] = state.catExpanded[cat] === false ? true : false;
+      state.catExpanded[cat] = state.catExpanded[cat] === true ? false : true;
       const body    = btn.closest('.cat-section')?.querySelector('.cat-body');
       const chevron = btn.querySelector('div:last-child');
-      if (body)    body.style.display = state.catExpanded[cat] === false ? 'none' : '';
-      if (chevron) chevron.style.transform = state.catExpanded[cat] === false ? 'rotate(-90deg)' : '';
+      if (body)    body.style.display = state.catExpanded[cat] === true ? '' : 'none';
+      if (chevron) chevron.style.transform = state.catExpanded[cat] === true ? '' : 'rotate(-90deg)';
       return;
     }
     if (action === 'set-status')  { setStatus(btn.dataset.key, btn.dataset.status); return; }
