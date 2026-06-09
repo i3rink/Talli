@@ -1241,14 +1241,13 @@
 
   async function joinSession(code) {
     /* code arrives already uppercased + dash-stripped from the click handler.
-       Try exact match first (new format), then fall back to the old dashed
-       format AB-YYMM-N in case the warehouse team is joining an older session. */
-    let { data, error } = await sb.from('sessions').select('*').eq('code', code).single();
-    if ((error || !data) && code.length === 6 && code.startsWith('AB')) {
-      /* try inserting dashes: AB2606R → AB-2606-R */
-      const dashed = code.slice(0,2) + '-' + code.slice(2,6) + '-' + code.slice(6);
-      const res = await sb.from('sessions').select('*').eq('code', dashed).single();
-      data = res.data; error = res.error;
+       Try the normalised form first, then rebuild AB-YYMM-N dashes to match
+       old sessions stored with dashes (e.g. AB2606R → AB-2606-R). */
+    const tryCode = async (c) => sb.from('sessions').select('*').eq('code', c).single();
+    let { data, error } = await tryCode(code);
+    if (error || !data) {
+      const dashed = code.replace(/^(AB)(\d{4})(.+)$/, '$1-$2-$3');
+      if (dashed !== code) { const r = await tryCode(dashed); data = r.data; error = r.error; }
     }
     if (error || !data) { toast('Session not found \u2014 check the code'); return; }
     state.session = { id: data.id, code: data.code, masterList: data.master_list, jobs: data.jobs };
@@ -1325,11 +1324,11 @@
     const code = el.value.trim().toUpperCase().replace(/[\s\-]/g, '');
     if (!code) { toast('Enter a session code'); return; }
     state.c2.loading = true; render();
-    let { data, error } = await sb.from('sessions').select('*').eq('code', code).single();
-    if ((error || !data) && code.length === 6 && code.startsWith('AB')) {
-      const dashed = code.slice(0,2) + '-' + code.slice(2,6) + '-' + code.slice(6);
-      const res = await sb.from('sessions').select('*').eq('code', dashed).single();
-      data = res.data; error = res.error;
+    const tryCode = async (c) => sb.from('sessions').select('*').eq('code', c).single();
+    let { data, error } = await tryCode(code);
+    if (error || !data) {
+      const dashed = code.replace(/^(AB)(\d{4})(.+)$/, '$1-$2-$3');
+      if (dashed !== code) { const r = await tryCode(dashed); data = r.data; error = r.error; }
     }
     state.c2.loading = false;
     if (error || !data) { toast('Session not found \u2014 check the code'); render(); return; }
