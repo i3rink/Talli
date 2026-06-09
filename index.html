@@ -1759,11 +1759,6 @@
     state.view         = 'c3-check'; render();
   }
 
-    state.c3.loading   = false;
-    state.c3.delivered = {};
-    state.view         = 'c3-check'; render();
-  }
-
   async function submitC3Delivery() {
     const items     = state.c3.items;
     const delivered = state.c3.delivered;
