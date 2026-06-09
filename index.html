@@ -316,6 +316,62 @@
     /* ── Pick row indicator ── */
     .pick-indicator { font-weight: 700; font-size: 1rem; flex-shrink: 0; width: 20px; text-align: center; }
 
+    /* ── Dashboard ── */
+    .dash-wrap { margin-top: 20px; }
+    .dash-heading {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .dash-heading-title {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-size: .8rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em; color: var(--muted);
+    }
+    .dash-section {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); box-shadow: var(--shadow);
+      margin-bottom: 10px; overflow: hidden;
+    }
+    .dash-section-head {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 16px; border-bottom: 1px solid var(--border);
+    }
+    .dash-stripe { width: 4px; height: 20px; border-radius: 2px; flex-shrink: 0; }
+    .dash-section-title {
+      font-family: 'Bricolage Grotesque', sans-serif;
+      font-size: .88rem; font-weight: 700; flex: 1; color: var(--text);
+    }
+    .dash-count {
+      font-size: .72rem; font-weight: 700; padding: 2px 9px;
+      border-radius: 20px; background: #fee2e2; color: var(--red);
+    }
+    .dash-count.ok { background: #d1fae5; color: var(--green); }
+    .dash-job-group { border-bottom: 1px solid var(--border); }
+    .dash-job-group:last-child { border-bottom: none; }
+    .dash-job-label {
+      padding: 7px 16px 3px; font-size: .72rem; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .05em;
+      color: var(--muted); background: var(--bg);
+    }
+    .dash-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 16px; border-top: 1px solid var(--border);
+      font-size: .84rem;
+    }
+    .dash-item-name { flex: 1; font-weight: 500; color: var(--text); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .dash-item-short { color: var(--red); font-weight: 700; font-size: .8rem; white-space: nowrap; }
+    .dash-item-detail { color: var(--muted); font-size: .78rem; white-space: nowrap; }
+    .dash-more { padding: 6px 16px; font-size: .78rem; color: var(--muted); border-top: 1px solid var(--border); }
+    .dash-footer {
+      padding: 10px 16px; display: flex; justify-content: flex-end;
+      border-top: 1px solid var(--border); background: var(--bg);
+    }
+    .dash-clear {
+      text-align: center; padding: 28px 16px; color: var(--muted);
+    }
+    .dash-clear-icon { font-size: 2rem; margin-bottom: 6px; }
+    .dash-loading { padding: 20px 16px; text-align: center; color: var(--muted); font-size: .84rem; }
+
     @media (max-width: 520px) {
       .item-row { flex-wrap: wrap; }
       .session-code { font-size: 1.3rem; }
@@ -451,6 +507,8 @@
     c3: { jobRef: '', items: [], delivered: {}, driverName: '', loading: false, session: null },
     /* module 4 — stock checker */
     c4: { screen: 'overview' },
+    /* home dashboard */
+    dash: { loading: true, m1: [], m2: [], m3: [] },
   };
 
   /* ═══════════════════════════════════════════════
@@ -515,6 +573,8 @@
   function renderHome() {
     const h = new Date().getHours();
     const greet = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
+    /* Trigger dashboard load after this render cycle */
+    setTimeout(loadDashboard, 0);
     return `
       <div class="lp-intro">
         <h1>Good ${greet}.</h1>
@@ -546,6 +606,13 @@
           <span class="lp-desc">Physical counts by category, variance review, audit trail.</span>
           <span class="lp-glyph">&#9632;</span>
         </button>
+      </div>
+      <div class="dash-wrap">
+        <div class="dash-heading">
+          <span class="dash-heading-title">Pending actions</span>
+          <button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>
+        </div>
+        <div id="dashboard"><div class="dash-loading">Loading&#8230;</div></div>
       </div>`;
   }
 
@@ -821,7 +888,7 @@
         <div class="card-title">Driver Delivery</div>
         <p class="text-muted text-sm" style="margin-bottom:16px;">Enter your job number to see what to deliver on site.</p>
         <div style="display:flex;flex-direction:column;gap:10px;">
-          <input id="c3-job" type="text" placeholder="Job ref e.g. Q1785 or 1785" autocapitalize="characters"
+          <input id="c3-job" type="text" placeholder="Job number e.g. 1659" autocapitalize="off"
             style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
           <input id="c3-driver" type="text" placeholder="Your name (optional)"
             style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" value="${esc(state.c3.driverName)}" />
@@ -971,10 +1038,16 @@
     }
     if (action === 'go-home') {
       state.module = 'home'; state.view = 'home';
+      state.dash = { loading: true, m1: [], m2: [], m3: [] };
       state.c2 = { session: null, selectedJob: null, picks: {}, loading: false };
       state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null };
       render(); return;
     }
+
+    if (action === 'dash-refresh')  { loadDashboard(); return; }
+    if (action === 'copy-dash-m1') { copyDashM1(); return; }
+    if (action === 'copy-dash-m2') { copyDashM2(); return; }
+    if (action === 'copy-dash-m3') { copyDashM3(); return; }
 
     /* ── module 1 ── */
     if (action === 'browse-files') { document.getElementById('file-input').click(); return; }
@@ -1296,6 +1369,227 @@
   }
 
   /* ═══════════════════════════════════════════════
+     HOME DASHBOARD
+  ═══════════════════════════════════════════════ */
+  async function loadDashboard() {
+    const el = document.getElementById('dashboard');
+    if (!el) return;
+    try {
+      /* M2 — pick shortfalls */
+      const { data: picks } = await sb.from('pick_completions')
+        .select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200);
+
+      /* M3 — remedial deliveries */
+      const { data: delivs } = await sb.from('deliveries')
+        .select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200);
+
+      /* M1 — purchasing shortfalls: load recent short checks + their sessions */
+      const { data: shortChecks } = await sb.from('checks')
+        .select('*').in('status', ['short', 'part'])
+        .order('updated_at', { ascending: false }).limit(300);
+
+      let m1 = [];
+      if (shortChecks && shortChecks.length) {
+        const sessIds = [...new Set(shortChecks.map(c => c.session_id))].slice(0, 8);
+        const { data: sessions } = await sb.from('sessions')
+          .select('id, code, master_list').in('id', sessIds);
+        (sessions || []).forEach(sess => {
+          const sessChecks = shortChecks.filter(c => c.session_id === sess.id);
+          const mlMap = new Map((sess.master_list || []).map(i => [String(i.key), i]));
+          const items = sessChecks.map(c => {
+            const item = mlMap.get(String(c.item_key)) || {};
+            const have = c.status === 'part' ? (Number(c.have_qty) || 0) : 0;
+            const needed = Number(item.qty) || 0;
+            return { name: item.name || c.item_key, sku: item.sku || '', needed, have, toOrder: needed - have };
+          }).filter(i => i.toOrder > 0);
+          if (items.length) m1.push({ code: sess.code, items });
+        });
+      }
+
+      /* Group M2 by job */
+      const m2Map = new Map();
+      (picks || []).forEach(r => {
+        const job = displayJobRef(r.job_ref) || r.job_ref;
+        if (!m2Map.has(job)) m2Map.set(job, []);
+        m2Map.get(job).push(r);
+      });
+
+      /* Group M3 by job */
+      const m3Map = new Map();
+      (delivs || []).forEach(r => {
+        const job = displayJobRef(r.job_ref) || r.job_ref;
+        if (!m3Map.has(job)) m3Map.set(job, []);
+        m3Map.get(job).push(r);
+      });
+
+      state.dash = {
+        loading: false,
+        m1,
+        m2: [...m2Map.entries()],
+        m3: [...m3Map.entries()],
+      };
+      el.innerHTML = renderDashboardContent();
+    } catch (err) {
+      console.error('Dashboard error:', err);
+      if (el) el.innerHTML = '<p class="dash-loading">Could not load pending actions.</p>';
+    }
+  }
+
+  function renderDashboardContent() {
+    const { m1, m2, m3 } = state.dash;
+    const m1Count = m1.reduce((s, g) => s + g.items.length, 0);
+    const m2Count = m2.reduce((s, [, rows]) => s + rows.length, 0);
+    const m3Count = m3.reduce((s, [, rows]) => s + rows.length, 0);
+
+    if (!m1Count && !m2Count && !m3Count) {
+      return `<div class="dash-clear">
+        <div class="dash-clear-icon">&#10003;</div>
+        <div style="font-weight:700;color:var(--green);margin-bottom:4px;">All clear</div>
+        <div class="text-muted text-sm">No outstanding shortfalls across any module.</div>
+      </div>`;
+    }
+
+    /* ── M1 ── */
+    let m1Html = '';
+    if (m1Count) {
+      const MAX = 5;
+      let rows = '', shown = 0;
+      m1.forEach(({ code, items }) => {
+        rows += `<div class="dash-job-label">Session ${esc(code)}</div>`;
+        items.slice(0, Math.max(0, MAX - shown)).forEach(i => {
+          rows += `<div class="dash-item">
+            <div class="dash-item-name">${esc(i.name)}</div>
+            ${i.sku ? `<span class="dash-item-detail">${esc(i.sku)}</span>` : ''}
+            <span class="dash-item-short">Order ${i.toOrder}</span>
+          </div>`;
+        });
+        shown += items.length;
+      });
+      const extra = m1Count - Math.min(m1Count, MAX);
+      m1Html = `<div class="dash-section">
+        <div class="dash-section-head">
+          <div class="dash-stripe" style="background:#0075ab;"></div>
+          <div class="dash-section-title">01 &nbsp;Purchasing shortfalls</div>
+          <span class="dash-count">${m1Count} item${m1Count !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="dash-job-group">${rows}</div>
+        ${extra > 0 ? `<div class="dash-more">+${extra} more items</div>` : ''}
+        <div class="dash-footer">
+          <button class="btn btn-ghost" data-action="copy-dash-m1" style="font-size:.8rem;padding:6px 14px;">&#128203; Copy purchasing list</button>
+        </div>
+      </div>`;
+    }
+
+    /* ── M2 ── */
+    let m2Html = '';
+    if (m2Count) {
+      const MAX = 6;
+      let rows = '', shown = 0;
+      m2.forEach(([job, items]) => {
+        if (shown >= MAX) return;
+        rows += `<div class="dash-job-label">Job ${esc(job)}</div>`;
+        items.slice(0, Math.max(0, MAX - shown)).forEach(i => {
+          rows += `<div class="dash-item">
+            <div class="dash-item-name">${esc(i.item_name)}</div>
+            <span class="dash-item-detail">Needed ${i.needed_qty} &middot; Picked ${i.picked_qty}</span>
+            <span class="dash-item-short">Short ${i.shortfall}</span>
+          </div>`;
+        });
+        shown += items.length;
+      });
+      const extra = m2Count - Math.min(m2Count, MAX);
+      m2Html = `<div class="dash-section">
+        <div class="dash-section-head">
+          <div class="dash-stripe" style="background:#059669;"></div>
+          <div class="dash-section-title">02 &nbsp;Pick shortfalls</div>
+          <span class="dash-count">${m2Count} item${m2Count !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="dash-job-group">${rows}</div>
+        ${extra > 0 ? `<div class="dash-more">+${extra} more items</div>` : ''}
+        <div class="dash-footer">
+          <button class="btn btn-ghost" data-action="copy-dash-m2" style="font-size:.8rem;padding:6px 14px;">&#128203; Copy pick shortfalls</button>
+        </div>
+      </div>`;
+    }
+
+    /* ── M3 ── */
+    let m3Html = '';
+    if (m3Count) {
+      const MAX = 6;
+      let rows = '', shown = 0;
+      m3.forEach(([job, items]) => {
+        if (shown >= MAX) return;
+        const driver = items[0]?.driver_name ? ` &middot; Driver: ${esc(items[0].driver_name)}` : '';
+        rows += `<div class="dash-job-label">Job ${esc(job)}${driver}</div>`;
+        items.slice(0, Math.max(0, MAX - shown)).forEach(i => {
+          rows += `<div class="dash-item">
+            <div class="dash-item-name">${esc(i.item_name)}</div>
+            <span class="dash-item-detail">Expected ${i.picked_qty} &middot; Delivered ${i.delivered_qty}</span>
+            <span class="dash-item-short">Short ${i.shortfall}</span>
+          </div>`;
+        });
+        shown += items.length;
+      });
+      const extra = m3Count - Math.min(m3Count, MAX);
+      m3Html = `<div class="dash-section">
+        <div class="dash-section-head">
+          <div class="dash-stripe" style="background:#ea580c;"></div>
+          <div class="dash-section-title">03 &nbsp;Remedial deliveries needed</div>
+          <span class="dash-count">${m3Count} item${m3Count !== 1 ? 's' : ''}</span>
+        </div>
+        <div class="dash-job-group">${rows}</div>
+        ${extra > 0 ? `<div class="dash-more">+${extra} more items</div>` : ''}
+        <div class="dash-footer">
+          <button class="btn btn-ghost" data-action="copy-dash-m3" style="font-size:.8rem;padding:6px 14px;">&#128203; Copy remedial list</button>
+        </div>
+      </div>`;
+    }
+
+    return m1Html + m2Html + m3Html;
+  }
+
+  /* ── Dashboard copy functions ── */
+  function copyDashM1() {
+    const { m1 } = state.dash;
+    if (!m1.length) { toast('Nothing to copy'); return; }
+    const lines = ['ANNICK BATHROOMS \u2014 PURCHASING SHORTFALLS',
+      `Generated: ${new Date().toLocaleString('en-GB')}`, ''];
+    m1.forEach(({ code, items }) => {
+      lines.push(`Session: ${code}`);
+      items.forEach(i => lines.push(`  ${i.name}${i.sku ? ' (' + i.sku + ')' : ''} \u2014 Order ${i.toOrder}`));
+      lines.push('');
+    });
+    navigator.clipboard.writeText(lines.join('\n')).then(() => toast('Purchasing list copied!'));
+  }
+
+  function copyDashM2() {
+    const { m2 } = state.dash;
+    if (!m2.length) { toast('Nothing to copy'); return; }
+    const lines = ['ANNICK BATHROOMS \u2014 PICK SHORTFALLS',
+      `Generated: ${new Date().toLocaleString('en-GB')}`, ''];
+    m2.forEach(([job, items]) => {
+      lines.push(`Job ${job}`);
+      items.forEach(i => lines.push(`  ${i.item_name} \u2014 Needed ${i.needed_qty}, Picked ${i.picked_qty}, Short ${i.shortfall}`));
+      lines.push('');
+    });
+    navigator.clipboard.writeText(lines.join('\n')).then(() => toast('Pick shortfalls copied!'));
+  }
+
+  function copyDashM3() {
+    const { m3 } = state.dash;
+    if (!m3.length) { toast('Nothing to copy'); return; }
+    const lines = ['ANNICK BATHROOMS \u2014 REMEDIAL DELIVERIES REQUIRED',
+      `Generated: ${new Date().toLocaleString('en-GB')}`, ''];
+    m3.forEach(([job, items]) => {
+      const driver = items[0]?.driver_name ? ` (Driver: ${items[0].driver_name})` : '';
+      lines.push(`Job ${job}${driver}`);
+      items.forEach(i => lines.push(`  ${i.item_name} \u2014 Expected ${i.picked_qty}, Delivered ${i.delivered_qty}, Short ${i.shortfall}`));
+      lines.push('');
+    });
+    navigator.clipboard.writeText(lines.join('\n')).then(() => toast('Remedial list copied!'));
+  }
+
+  /* ═══════════════════════════════════════════════
      SUPABASE — M2 pick completion
   ═══════════════════════════════════════════════ */
 
@@ -1419,41 +1713,51 @@
     const jobEl    = document.getElementById('c3-job');
     const driverEl = document.getElementById('c3-driver');
     if (!jobEl) return;
-    let jobRef = jobEl.value.trim().toUpperCase();
-    if (!jobRef) { toast('Enter a job reference'); return; }
-    if (/^\d+$/.test(jobRef)) jobRef = 'Q' + jobRef;
-    state.c3.jobRef     = jobRef;
+    const raw = jobEl.value.trim();
+    if (!raw) { toast('Enter a job reference'); return; }
+    /* Strip Q prefix and non-digits for comparison — "Q1659", "1659" and
+       "1659 packing slip 24_5_26" all resolve to "1659" via displayJobRef. */
+    const jobNum = displayJobRef(raw.replace(/^Q/i, '').trim()) || raw.trim();
+    state.c3.jobRef     = jobNum;
     state.c3.driverName = driverEl ? driverEl.value.trim() : '';
     state.c3.loading    = true; render();
 
-    /* prefer Module 2 pick data */
-    const { data: pickData } = await sb.from('pick_completions').select('*').eq('job_ref', jobRef);
-    if (pickData && pickData.length > 0) {
+    /* Check pick_completions first — search for any job_ref whose display
+       form matches the entered number (handles "Q1659", "1659 packing slip…" etc) */
+    const { data: allPicks } = await sb.from('pick_completions').select('*')
+      .order('updated_at', { ascending: false }).limit(500);
+    const pickData = (allPicks || []).filter(r => displayJobRef(r.job_ref) === jobNum);
+
+    if (pickData.length > 0) {
       const seen = new Map();
       pickData.forEach(row => {
         if (!seen.has(row.item_key) || row.updated_at > seen.get(row.item_key).updated_at) seen.set(row.item_key, row);
       });
-      state.c3.items   = [...seen.values()].map(r => ({ key: r.item_key, name: r.item_name, sku: '', qty: r.picked_qty, unit: 'pcs', jobs: [jobRef] }));
+      state.c3.items   = [...seen.values()].map(r => ({ key: r.item_key, name: r.item_name, sku: '', qty: r.picked_qty, unit: 'pcs', jobs: [jobNum] }));
       state.c3.session = null;
     } else {
-      /* fall back to session master_list */
+      /* Fall back to session master_list — match on displayJobRef so "1659"
+         matches both "Q1659" and "1659 packing slip 24_5_26" */
       const { data: sessions } = await sb.from('sessions').select('*').order('created_at', { ascending: false }).limit(30);
-      /* filter client-side — handles sessions.jobs stored as strings OR objects */
       const matched = (sessions || []).find(s =>
-        (s.jobs || []).some(j => normJobRef(j) === jobRef) ||
-        (s.master_list || []).some(i => (i.jobs || []).map(normJobRef).includes(jobRef))
+        (s.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum) ||
+        (s.master_list || []).some(i => (i.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum))
       );
       if (!matched) {
         state.c3.loading = false;
-        toast('No data found for ' + jobRef + '. Has Pick Verifier been run for this job?');
+        toast('No data found for job ' + jobNum + '. Has Pick Verifier been run for this job?');
         render(); return;
       }
-      const sess = matched;
-      state.c3.session = sess;
-      state.c3.items   = (sess.master_list || [])
-        .filter(i => (i.jobs || []).map(normJobRef).includes(jobRef));
-      if (!state.c3.items.length) { state.c3.loading = false; toast('No items found for ' + jobRef); render(); return; }
+      state.c3.session = matched;
+      state.c3.items   = (matched.master_list || [])
+        .filter(i => (i.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum));
+      if (!state.c3.items.length) { state.c3.loading = false; toast('No items found for job ' + jobNum); render(); return; }
     }
+
+    state.c3.loading   = false;
+    state.c3.delivered = {};
+    state.view         = 'c3-check'; render();
+  }
 
     state.c3.loading   = false;
     state.c3.delivered = {};
