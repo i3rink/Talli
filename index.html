@@ -26,7 +26,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
-    /* ── Version: 2.3.11 ── */
+    /* ── Version: 2.3.12 ── */
 
     :root {
       --teal:        #0075ab;
@@ -463,7 +463,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span id="header-sub">v2.3.11</span>
+      <span id="header-sub">v2.3.12</span>
     </div>
   </div>
 
@@ -501,7 +501,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
   const MODULE_LABELS = {
-    home: 'v2.3.11',
+    home: 'v2.3.12',
     verifier: 'Pick Verifier',
     completion: 'Pick Completion',
     delivery: 'Driver Delivery',
@@ -1677,7 +1677,7 @@
   async function pushCheck(key) {
     if (!state.session?.id || state.session.id === 'local') return;
     const c = state.checks[key];
-    await sb.from('checks').insert({ session_id: state.session.id, item_key: key, status: c?.status || null, have_qty: c?.haveQty || null, created_at: new Date().toISOString() });
+    await sb.from('checks').insert({ session_id: state.session.id, item_key: key, status: c?.status || null, have_qty: c?.haveQty || null });
   }
 
   /* ═══════════════════════════════════════════════
