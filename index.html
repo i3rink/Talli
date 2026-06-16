@@ -539,6 +539,9 @@
     pickerApiLoaded: false,
     stagedFiles:     [],   /* files queued before session creation */
     dupWarnings:     [],   /* duplicate job warnings pending user decision */
+    altModal:        null,  /* { key, name, qty } when alt input is open */
+    alternatives:    {},    /* key -> { altName, altSku } saved locally */
+    driveFileDocs:   [],    /* Drive doc metadata from picker for PDF links */
     catExpanded:     {},   /* category open/closed state in check view */
     catSubmitted:    {},   /* categories marked done by user */
     /* module 2 — pick completion */
@@ -782,6 +785,19 @@
         <div>${s.jobs.map(j => `<span class="job-tag">${esc(j)}</span>`).join('')}</div>
         <p class="text-muted text-sm mt-2">${s.masterList.length} line items consolidated</p>
       </div>
+      ${(state.session.sourceFiles && state.session.sourceFiles.length) ? `
+      <div class="card">
+        <div class="card-title">Source PDFs</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          ${state.session.sourceFiles.map(f => `
+            <a href="${esc(f.url)}" target="_blank" rel="noopener noreferrer"
+              style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;text-decoration:none;color:var(--text);font-size:.87rem;font-weight:500;background:var(--bg);">
+              <span style="font-size:1.1rem;">&#128196;</span>
+              <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(f.name)}</span>
+              <span style="color:var(--muted);font-size:.75rem;flex-shrink:0;">Open in Drive &#8599;</span>
+            </a>`).join('')}
+        </div>
+      </div>` : ''}
       <button class="btn btn-ghost mt-2" data-action="back-upload">&#8592; Upload different files</button>`;
   }
 
@@ -865,19 +881,22 @@
   }
 
   function renderItemRow(item, checks) {
-    const c = checks[item.key] || {};
-    const st = c.status || '';
+    const c   = checks[item.key] || {};
+    const st  = c.status || '';
+    const alt = state.alternatives?.[item.key];
     const skuHtml  = item.sku  ? `<span class="item-sku">${esc(item.sku)}</span>` : '';
     const unitHtml = item.unit ? ' ' + esc(item.unit) : '';
+    const altBadge = alt ? `<span style="display:inline-block;margin-left:6px;padding:1px 7px;border-radius:20px;font-size:.7rem;font-weight:700;background:#ede9fe;color:#7c3aed;">Alt proposed</span>` : '';
     return `
       <div class="item-row ${st ? 'status-' + (st === 'in' ? 'in' : st === 'part' ? 'part' : 'short') : ''}" data-key="${esc(item.key)}">
-        <div class="item-name">${esc(item.name)}${skuHtml}</div>
+        <div class="item-name">${esc(item.name)}${skuHtml}${altBadge}</div>
         <div class="item-qty">Qty: ${item.qty}${unitHtml}</div>
         ${st === 'part' ? `<input class="qty-input" type="number" min="0" max="${item.qty}" placeholder="Have?" value="${c.haveQty || ''}" data-action="qty-input" data-key="${esc(item.key)}" />` : ''}
         <div class="item-status">
           <button class="status-btn ${st === 'in'    ? 'active-green' : ''}" data-action="set-status" data-key="${esc(item.key)}" data-status="in"    title="In stock">&#10003;</button>
           <button class="status-btn ${st === 'part'  ? 'active-amber' : ''}" data-action="set-status" data-key="${esc(item.key)}" data-status="part"  title="Partial">~</button>
           <button class="status-btn ${st === 'short' ? 'active-red'   : ''}" data-action="set-status" data-key="${esc(item.key)}" data-status="short" title="Short">&#10007;</button>
+          <button class="status-btn ${alt ? 'active-amber' : ''}" data-action="open-alt" data-key="${esc(item.key)}" data-name="${esc(item.name)}" data-qty="${item.qty}" title="Propose alternative" style="font-size:.7rem;font-weight:700;color:${alt ? '#7c3aed' : 'var(--muted)'};border-color:${alt ? '#c4b5fd' : 'var(--border)'};">Alt</button>
         </div>
       </div>`;
   }
@@ -952,10 +971,42 @@
       sections || `<div class="empty-state"><div class="icon">&#10003;</div><p>Nothing here</p></div>`);
   }
 
+  function renderAltModal() {
+    const m = state.altModal;
+    if (!m) return '';
+    const existing = state.alternatives?.[m.key] || {};
+    return `
+      <div id="alt-modal-overlay" style="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;display:flex;align-items:center;justify-content:center;padding:20px;">
+        <div style="background:var(--surface);border-radius:var(--radius);padding:22px;width:100%;max-width:420px;box-shadow:var(--shadow-lg);">
+          <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:1rem;margin-bottom:4px;">Propose alternative</div>
+          <div style="font-size:.83rem;color:var(--muted);margin-bottom:16px;">${esc(m.name)} &middot; Qty ${m.qty}</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <div>
+              <label style="font-size:.78rem;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Alternative item name</label>
+              <input id="alt-name-input" type="text" placeholder="e.g. Brushed Nickel Basin Mixer" value="${esc(existing.altName || '')}"
+                style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:7px;font-family:inherit;font-size:.9rem;outline:none;" />
+            </div>
+            <div>
+              <label style="font-size:.78rem;font-weight:600;color:var(--muted);display:block;margin-bottom:4px;">Alternative SKU</label>
+              <input id="alt-sku-input" type="text" placeholder="e.g. BR-NICKEL241" value="${esc(existing.altSku || '')}"
+                style="width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:7px;font-family:inherit;font-size:.9rem;outline:none;" />
+            </div>
+            <div style="font-size:.75rem;color:var(--muted);">At least one field required.</div>
+            <div id="alt-error" style="color:var(--red);font-size:.8rem;min-height:18px;"></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap;">
+            <button class="btn btn-primary" data-action="alt-save" style="background:#7c3aed;border-color:#7c3aed;">Save alternative</button>
+            ${existing.altName || existing.altSku ? `<button class="btn btn-ghost" data-action="alt-clear" style="color:var(--red);">Remove</button>` : ''}
+            <button class="btn btn-ghost" data-action="alt-close">Cancel</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
   function renderCheckShell(total, done, pct, checks, inner) {
     const shortCount = Object.values(checks).filter(c => c.status === 'short' || c.status === 'part').length;
     const inCount    = Object.values(checks).filter(c => c.status === 'in').length;
-    return `
+    return `${renderAltModal()}
       <div class="card">
         <div class="flex justify-between items-center" style="margin-bottom:10px;">
           <div>
@@ -1301,6 +1352,9 @@
       state.catExpanded = {};
       state.catSubmitted = {};
       state.dupWarnings = [];
+      state.altModal = null;
+      state.alternatives = {};
+      state.driveFileDocs = [];
       render(); return;
     }
 
@@ -1323,6 +1377,31 @@
     }
 
     /* ── dashboard archive actions ── */
+    if (action === 'alt-approve') {
+      const { id, session: sessionId, key, altname, altsku, qty } = btn.dataset;
+      /* Update alternatives row to approved */
+      const { error: e1 } = await sb.from('alternatives').update({ status: 'approved', updated_at: new Date().toISOString() }).eq('id', id);
+      if (e1) { toast('Could not approve — try again'); console.error(e1); return; }
+      /* Add the alternative as a new item in the session master_list */
+      const { data: sess } = await sb.from('sessions').select('master_list').eq('id', sessionId).single();
+      if (sess) {
+        const ml = sess.master_list || [];
+        const newKey = altsku ? altsku.toUpperCase() : 'ALT-' + key;
+        if (!ml.find(i => i.key === newKey)) {
+          ml.push({ key: newKey, name: altname || altsku, sku: altsku || '', qty: Number(qty) || 1, unit: 'pcs', fromBundle: null, jobs: [], jobQtys: {}, isAlternative: true, replacesKey: key });
+          await sb.from('sessions').update({ master_list: ml }).eq('id', sessionId);
+        }
+      }
+      toast('✓ Alternative approved and added to pick list');
+      loadDashboard(); return;
+    }
+    if (action === 'alt-reject') {
+      const { id } = btn.dataset;
+      const { error } = await sb.from('alternatives').update({ status: 'rejected', updated_at: new Date().toISOString() }).eq('id', id);
+      if (error) { toast('Could not reject — try again'); console.error(error); return; }
+      toast('Alternative rejected');
+      loadDashboard(); return;
+    }
     if (action === 'dash-archive-session') {
       e.stopPropagation();
       const code = btn.dataset.code;
@@ -1442,6 +1521,45 @@
       if (body)    body.style.display = state.catExpanded[cat] === true ? '' : 'none';
       if (chevron) chevron.style.transform = state.catExpanded[cat] === true ? '' : 'rotate(-90deg)';
       return;
+    }
+    if (action === 'open-alt') {
+      state.altModal = { key: btn.dataset.key, name: btn.dataset.name, qty: btn.dataset.qty };
+      render(); return;
+    }
+    if (action === 'alt-close') { state.altModal = null; render(); return; }
+    if (action === 'alt-clear') {
+      const key = state.altModal?.key;
+      if (key) delete state.alternatives[key];
+      state.altModal = null; render(); return;
+    }
+    if (action === 'alt-save') {
+      const altName = document.getElementById('alt-name-input')?.value.trim() || '';
+      const altSku  = document.getElementById('alt-sku-input')?.value.trim() || '';
+      const errEl   = document.getElementById('alt-error');
+      if (!altName && !altSku) {
+        if (errEl) errEl.textContent = 'Enter an item name or SKU before saving.';
+        return;
+      }
+      const key = state.altModal.key;
+      if (!state.alternatives) state.alternatives = {};
+      state.alternatives[key] = { altName, altSku };
+      /* Save to Supabase alternatives table */
+      if (state.session?.id && state.session.id !== 'local') {
+        const item = state.session.masterList.find(i => i.key === key) || {};
+        await sb.from('alternatives').insert({
+          session_id: state.session.id,
+          item_key:   key,
+          item_name:  item.name || key,
+          alt_name:   altName || null,
+          alt_sku:    altSku  || null,
+          qty:        item.qty || null,
+          status:     'pending',
+          updated_at: new Date().toISOString(),
+        });
+      }
+      state.altModal = null;
+      toast('Alternative saved');
+      render(); return;
     }
     if (action === 'submit-cat') {
       const cat = btn.dataset.cat;
@@ -1572,6 +1690,12 @@
         const blob = await downloadDriveFile(doc.id, token);
         return new File([blob], doc.name, { type: 'application/pdf' });
       }));
+      /* Store Drive metadata for PDF links */
+      docs.forEach(doc => {
+        if (!state.driveFileDocs.find(d => d.id === doc.id)) {
+          state.driveFileDocs.push({ id: doc.id, name: doc.name });
+        }
+      });
       handleFiles(files);
     } catch (err) {
       console.error('Drive pick error:', err);
@@ -1753,10 +1877,11 @@
   ═══════════════════════════════════════════════ */
   async function createSession(masterList, jobs) {
     const code = generateCode();
-    const { data, error } = await sb.from('sessions').insert({ code, master_list: masterList, jobs, created_at: new Date().toISOString() }).select().single();
+    const sourceFiles = (state.driveFileDocs || []).map(d => ({ id: d.id, name: d.name, url: `https://drive.google.com/file/d/${d.id}/view` }));
+    const { data, error } = await sb.from('sessions').insert({ code, master_list: masterList, jobs, source_files: sourceFiles.length ? sourceFiles : null, created_at: new Date().toISOString() }).select().single();
     if (error) { console.error(error); toast('Could not save session \u2014 working offline'); return { id: 'local', code, masterList, jobs }; }
     subscribeToChecks(data.id);
-    return { id: data.id, code, masterList, jobs };
+    return { id: data.id, code, masterList, jobs, sourceFiles: data.source_files || [] };
   }
 
   async function joinSession(code) {
@@ -1994,7 +2119,11 @@
         m3Map.get(job).push(r);
       });
 
-      state.dash = { loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()] };
+      /* ── Alternatives pending review ── */
+      const { data: alts } = await sb.from('alternatives')
+        .select('*').eq('status', 'pending').order('updated_at', { ascending: false }).limit(100);
+
+      state.dash = { loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()], alts: alts || [] };
       el.innerHTML = renderDashboardContent();
     } catch (err) {
       console.error('Dashboard error:', err);
@@ -2127,7 +2256,38 @@
       </div>`;
     }
 
-    return m1Html + m2Html + m3Html;
+    /* ── Alternatives section ── */
+    let altHtml = '';
+    const alts = state.dash.alts || [];
+    if (alts.length) {
+      const altRows = alts.map(a => `
+        <div class="dash-item" style="flex-wrap:wrap;gap:6px;">
+          <div style="width:100%;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <div class="dash-item-name" style="white-space:normal;">${esc(a.item_name)}</div>
+            <span class="dash-item-detail">Qty ${a.qty || '?'}</span>
+          </div>
+          <div style="width:100%;font-size:.8rem;color:#7c3aed;font-weight:600;">
+            &#8594; ${esc(a.alt_name || '')}${a.alt_sku ? ' (' + esc(a.alt_sku) + ')' : ''}
+          </div>
+          <div style="display:flex;gap:6px;margin-top:4px;">
+            <button class="btn btn-primary" data-action="alt-approve" data-id="${esc(a.id)}" data-session="${esc(a.session_id)}" data-key="${esc(a.item_key)}" data-altname="${esc(a.alt_name||'')}" data-altsku="${esc(a.alt_sku||'')}" data-qty="${a.qty||''}"
+              style="padding:4px 12px;font-size:.78rem;background:#059669;">Approve</button>
+            <button class="btn btn-ghost" data-action="alt-reject" data-id="${esc(a.id)}"
+              style="padding:4px 12px;font-size:.78rem;color:var(--red);">Reject</button>
+          </div>
+        </div>`).join('');
+
+      altHtml = `<div class="dash-section">
+        <div class="dash-section-head">
+          <div class="dash-stripe" style="background:#7c3aed;"></div>
+          <div class="dash-section-title">Alternatives proposed</div>
+          <span class="dash-count" style="background:#ede9fe;color:#7c3aed;">${alts.length} item${alts.length !== 1 ? 's' : ''}</span>
+        </div>
+        ${altRows}
+      </div>`;
+    }
+
+    return altHtml + m1Html + m2Html + m3Html;
   }
 
   /* ── Dashboard copy functions ── */
