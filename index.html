@@ -26,7 +26,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
-    /* ── Version: 2.3.12 ── */
+    /* ── Version: 2.3.13 ── */
 
     :root {
       --teal:        #0075ab;
@@ -500,7 +500,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.3.12';
+  const VERSION = 'v2.3.13';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -741,7 +741,7 @@
       </div>` : '';
 
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="upload-cancel">&#8592; Cancel</button></div>
       ${dupHtml}
       <div class="card">
         <div class="card-title">New Stock Check Session</div>
@@ -1362,6 +1362,16 @@
       if (mod === 'stock')      { state.view = 'c4-overview'; }
       render(); return;
     }
+    /* ── upload-cancel: clears staging/append state, returns home without wiping M2/M3 ── */
+    if (action === 'upload-cancel') {
+      state.stagedFiles       = [];
+      state.appendTarget      = null;
+      state.dupWarnings       = [];
+      state.dupPendingJobObjs = null;
+      state.module = 'home'; state.view = 'home';
+      state.dash = { loading: true, m1: [], m2: [], m3: [] };
+      render(); return;
+    }
     if (action === 'go-home') {
       state.module = 'home'; state.view = 'home';
       state.dash = { loading: true, m1: [], m2: [], m3: [] };
@@ -1936,13 +1946,26 @@
     const existingAsJob = {
       id: '__existing__',
       items: target.masterList.map(i => ({
-        name: i.name, sku: i.sku || '', qty: i.qty, unit: i.unit || '',
+        name: i.name ? i.name.trim() : i.name,
+        sku: i.sku ? i.sku.trim() : '',
+        qty: i.qty, unit: i.unit || '',
         fromBundle: i.fromBundle || null,
       })),
     };
 
     /* Build merged master list — consolidates dupes automatically */
     const merged = buildMasterList([existingAsJob, ...newJobObjs]);
+
+    /* Post-merge dupe scan — keys must be unique after consolidation */
+    const _keySet = new Set(); const _dupKeys = [];
+    for (const _item of merged) {
+      if (_keySet.has(_item.key)) _dupKeys.push(_item.key);
+      else _keySet.add(_item.key);
+    }
+    if (_dupKeys.length) {
+      console.warn('appendToSession: duplicate keys after merge:', _dupKeys);
+      toast('⚠ ' + _dupKeys.length + ' duplicate item key(s) found after merge — check console', 5000);
+    }
 
     /* Merge job refs */
     const newJobIds = newJobObjs.map(j => j.id);
