@@ -542,6 +542,7 @@
     altModal:        null,  /* { key, name, qty } when alt input is open */
     alternatives:    {},    /* key -> { altName, altSku } saved locally */
     driveFileDocs:   [],    /* Drive doc metadata from picker for PDF links */
+    appendTarget:    null,  /* session to append to { id, code, masterList, jobs } */
     catExpanded:     {},   /* category open/closed state in check view */
     catSubmitted:    {},   /* categories marked done by user */
     /* module 2 — pick completion */
@@ -754,6 +755,23 @@
             style="flex:1;min-width:160px;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
           <button class="btn btn-outline" data-action="join-session">Join &#8594;</button>
         </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Add packing slips to existing session</div>
+        <p class="text-muted text-sm" style="margin-bottom:12px;">Missed a slip? Load a session by code and the new PDFs above will be merged in.</p>
+        ${state.appendTarget ? `
+          <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--teal-faint);border:1px solid var(--teal-light);border-radius:8px;margin-bottom:12px;">
+            <div style="flex:1;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;color:var(--teal);">Session ${esc(state.appendTarget.code)}</div>
+            <div class="text-muted text-sm">${state.appendTarget.masterList.length} items loaded</div>
+            <button class="btn btn-ghost" data-action="append-clear" style="padding:4px 10px;font-size:.78rem;">Clear</button>
+          </div>
+          ${state.stagedFiles.length ? `<button class="btn btn-primary" data-action="append-submit" style="width:100%;">Merge ${state.stagedFiles.length} file${state.stagedFiles.length !== 1 ? 's' : ''} into ${esc(state.appendTarget.code)} &#8594;</button>` : `<p class="text-muted text-sm">Upload PDFs above first, then merge.</p>`}
+        ` : `
+          <div class="flex gap-2 flex-wrap items-center">
+            <input id="append-code" type="text" placeholder="Session code e.g. AB3K7P"
+              style="flex:1;min-width:160px;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
+            <button class="btn btn-outline" data-action="append-load">Load &#8594;</button>
+          </div>`}
       </div>`;
   }
 
@@ -1355,6 +1373,7 @@
       state.altModal = null;
       state.alternatives = {};
       state.driveFileDocs = [];
+      state.appendTarget = null;
       render(); return;
     }
 
@@ -1500,6 +1519,25 @@
       render(); return;
     }
     if (action === 'stage-create') { processStaged(); return; }
+    if (action === 'append-load') {
+      const raw = document.getElementById('append-code')?.value.trim();
+      if (!raw) { toast('Enter a session code'); return; }
+      const code = raw.toUpperCase().replace(/[\s\-]/g, '');
+      const tryCode = async (c) => sb.from('sessions').select('*').eq('code', c).single();
+      let { data, error } = await tryCode(code);
+      if (error || !data) {
+        const dashed = code.replace(/^(AB)(\d{4})(.+)$/, '$1-$2-$3');
+        if (dashed !== code) { const r = await tryCode(dashed); data = r.data; error = r.error; }
+      }
+      if (error || !data) { toast('Session not found — check the code'); return; }
+      state.appendTarget = { id: data.id, code: data.code, masterList: data.master_list || [], jobs: data.jobs || [] };
+      toast('Session loaded — now upload the PDFs to merge');
+      render(); return;
+    }
+    if (action === 'append-clear') {
+      state.appendTarget = null; render(); return;
+    }
+    if (action === 'append-submit') { appendToSession(); return; }
     if (action === 'join-session') {
       const raw = document.getElementById('join-code').value.trim();
       const code = raw.toUpperCase().replace(/[\s\-]/g, '');
@@ -1875,6 +1913,66 @@
   /* ═══════════════════════════════════════════════
      SUPABASE — M1 sessions & checks
   ═══════════════════════════════════════════════ */
+  async function appendToSession() {
+    const target = state.appendTarget;
+    const files  = state.stagedFiles;
+    if (!target || !files.length) { toast('Load a session and upload PDFs first'); return; }
+
+    const prog = document.getElementById('parse-progress');
+    if (prog) prog.style.display = '';
+
+    /* Parse new files */
+    const newJobObjs = [];
+    for (let i = 0; i < files.length; i++) {
+      setProgress(Math.round(i / files.length * 70), `Parsing ${files[i].name}…`);
+      try { newJobObjs.push(await parseFile(files[i])); }
+      catch (err) { console.error('Parse error:', files[i].name, err); toast(`Could not parse ${files[i].name}`); }
+    }
+    if (!newJobObjs.length) { toast('No files parsed successfully'); return; }
+
+    setProgress(85, 'Merging into existing session…');
+
+    /* Convert existing master_list back into job-like objects for buildMasterList */
+    const existingAsJob = {
+      id: '__existing__',
+      items: target.masterList.map(i => ({
+        name: i.name, sku: i.sku || '', qty: i.qty, unit: i.unit || '',
+        fromBundle: i.fromBundle || null,
+      })),
+    };
+
+    /* Build merged master list — consolidates dupes automatically */
+    const merged = buildMasterList([existingAsJob, ...newJobObjs]);
+
+    /* Merge job refs */
+    const newJobIds = newJobObjs.map(j => j.id);
+    const mergedJobs = [...new Set([...target.jobs, ...newJobIds])];
+
+    /* Update session in Supabase */
+    setProgress(95, 'Saving…');
+    const { error } = await sb.from('sessions').update({
+      master_list: merged,
+      jobs: mergedJobs,
+    }).eq('id', target.id);
+
+    if (error) {
+      console.error(error);
+      toast('⚠ Could not save — check your connection');
+      return;
+    }
+
+    setProgress(100, 'Done!');
+    toast(`✓ ${newJobObjs.length} slip${newJobObjs.length !== 1 ? 's' : ''} merged into session ${target.code}`);
+
+    /* Load the updated session */
+    state.session = { id: target.id, code: target.code, masterList: merged, jobs: mergedJobs };
+    state.checks  = {};
+    state.stagedFiles  = [];
+    state.appendTarget = null;
+    state.view = 'session';
+    setTimeout(() => render(), 400);
+  }
+
   async function createSession(masterList, jobs) {
     const code = generateCode();
     const sourceFiles = (state.driveFileDocs || []).map(d => ({ id: d.id, name: d.name, url: `https://drive.google.com/file/d/${d.id}/view` }));
