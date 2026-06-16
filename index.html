@@ -726,8 +726,12 @@
         </div>
         <div style="display:flex;gap:10px;flex-wrap:wrap;">
           <button class="btn btn-primary" data-action="dup-continue" style="background:#d97706;border-color:#d97706;">
-            Continue anyway
+            Upload all anyway
           </button>
+          ${(state.dupPendingJobObjs || []).length > (state.dupWarnings || []).length ? `
+          <button class="btn btn-outline" data-action="dup-skip">
+            Skip duplicate${(state.dupWarnings||[]).length > 1 ? 's' : ''}, upload the rest
+          </button>` : ''}
           <button class="btn btn-ghost" data-action="dup-cancel">Cancel</button>
         </div>
       </div>` : '';
@@ -1359,6 +1363,32 @@
     /* ── module 1 ── */
     if (action === 'browse-files') { document.getElementById('file-input').click(); return; }
     if (action === 'drive-pick')   { handleDrivePick(); return; }
+    if (action === 'dup-skip') {
+      /* Log each skipped dupe to audit_log then proceed with non-dup jobs only */
+      const warnings = state.dupWarnings || [];
+      const dupRefs  = new Set(warnings.map(w => String(w.quoteRef).toUpperCase()));
+      for (const w of warnings) {
+        await sb.from('audit_log').insert({
+          event: 'duplicate_skipped',
+          detail: JSON.stringify({ quote_ref: w.quoteRef, existing_code: w.existingCode, existing_date: w.existingDate }),
+          created_at: new Date().toISOString(),
+        });
+      }
+      const jobObjs = (state.dupPendingJobObjs || []).filter(j => !dupRefs.has(String(j.id).toUpperCase()));
+      state.dupWarnings = [];
+      state.dupPendingJobObjs = null;
+      if (!jobObjs.length) {
+        toast('All files in this batch were duplicates — nothing to upload');
+        state.stagedFiles = [];
+        render(); return;
+      }
+      const masterList = buildMasterList(jobObjs);
+      const session = await createSession(masterList, jobObjs.map(j => j.id));
+      state.session = session; state.checks = {};
+      state.stagedFiles = [];
+      state.view = 'session';
+      render(); return;
+    }
     if (action === 'dup-cancel') {
       state.dupWarnings = [];
       state.dupPendingJobObjs = null;
