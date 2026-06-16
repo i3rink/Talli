@@ -26,7 +26,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
-    /* ── Version: 2.3.14 ── */
+    /* ── Version: 2.3.15 ── */
 
     :root {
       --teal:        #0075ab;
@@ -500,7 +500,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.3.14';
+  const VERSION = 'v2.3.15';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -758,9 +758,9 @@
           <button class="btn btn-outline" data-action="join-session">Join &#8594;</button>
         </div>
       </div>
-      <div class="card">
-        <div class="card-title">Add packing slips to existing session</div>
-        <p class="text-muted text-sm" style="margin-bottom:12px;">Missed a slip? Load a session by code and the new PDFs above will be merged in.</p>
+      <div class="card" style="background:#fffbeb;border-color:#fde68a;">
+        <div class="card-title" style="color:#92400e;">&#9888; Add packing slips to existing session</div>
+        <p class="text-muted text-sm" style="margin-bottom:12px;color:#78350f;">Missed a slip? Load a session by code and the new PDFs above will be merged in.</p>
         ${state.appendTarget ? `
           <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--teal-faint);border:1px solid var(--teal-light);border-radius:8px;margin-bottom:12px;">
             <div style="flex:1;font-family:'Bricolage Grotesque',sans-serif;font-weight:700;color:var(--teal);">Session ${esc(state.appendTarget.code)}</div>
