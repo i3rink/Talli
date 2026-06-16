@@ -26,7 +26,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
-    /* ── Version: 2.3.13 ── */
+    /* ── Version: 2.3.14 ── */
 
     :root {
       --teal:        #0075ab;
@@ -500,7 +500,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.3.13';
+  const VERSION = 'v2.3.14';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -543,6 +543,8 @@
     alternatives:    {},    /* key -> { altName, altSku } saved locally */
     driveFileDocs:   [],    /* Drive doc metadata from picker for PDF links */
     appendTarget:    null,  /* session to append to { id, code, masterList, jobs } */
+    appendDupWarnings:    [],   /* duplicate job warnings for append flow */
+    appendPendingJobObjs: null, /* parsed jobs pending append dupe decision */
     catExpanded:     {},   /* category open/closed state in check view */
     catSubmitted:    {},   /* categories marked done by user */
     /* module 2 — pick completion */
@@ -765,7 +767,25 @@
             <div class="text-muted text-sm">${state.appendTarget.masterList.length} items loaded</div>
             <button class="btn btn-ghost" data-action="append-clear" style="padding:4px 10px;font-size:.78rem;">Clear</button>
           </div>
-          ${state.stagedFiles.length ? `<button class="btn btn-primary" data-action="append-submit" style="width:100%;">Merge ${state.stagedFiles.length} file${state.stagedFiles.length !== 1 ? 's' : ''} into ${esc(state.appendTarget.code)} &#8594;</button>` : `<p class="text-muted text-sm">Upload PDFs above first, then merge.</p>`}
+          ${(state.appendDupWarnings && state.appendDupWarnings.length) ? `
+            <div style="background:#fffbeb;border:2px solid #f59e0b;border-radius:10px;padding:14px 16px;margin-bottom:12px;">
+              <div style="font-family:'Bricolage Grotesque',sans-serif;font-weight:700;font-size:.9rem;color:#92400e;margin-bottom:6px;">
+                &#9888; Duplicate job${state.appendDupWarnings.length > 1 ? 's' : ''} detected in this session
+              </div>
+              ${state.appendDupWarnings.map(w => `
+                <div style="font-size:.85rem;color:#78350f;margin-bottom:3px;">
+                  Job <strong>${esc(String(w).replace(/^Q/i,''))}</strong> is already in this session.
+                </div>`).join('')}
+              <div style="font-size:.82rem;color:#92400e;margin-top:8px;margin-bottom:12px;">
+                Merging will recalculate quantities from the slip. Only continue if the slip has changed.
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                <button class="btn btn-primary" data-action="append-dup-continue" style="background:#d97706;">Merge anyway</button>
+                ${(state.appendPendingJobObjs || []).length > (state.appendDupWarnings || []).length ? `
+                <button class="btn btn-outline" data-action="append-dup-skip">Skip duplicate${state.appendDupWarnings.length > 1 ? 's' : ''}, merge the rest</button>` : ''}
+                <button class="btn btn-ghost" data-action="append-dup-cancel">Cancel</button>
+              </div>
+            </div>` : state.stagedFiles.length ? `<button class="btn btn-primary" data-action="append-submit" style="width:100%;">Merge ${state.stagedFiles.length} file${state.stagedFiles.length !== 1 ? 's' : ''} into ${esc(state.appendTarget.code)} &#8594;</button>` : `<p class="text-muted text-sm">Upload PDFs above first, then merge.</p>`}
         ` : `
           <div class="flex gap-2 flex-wrap items-center">
             <input id="append-code" type="text" placeholder="Session code e.g. AB3K7P"
@@ -1529,6 +1549,27 @@
       render(); return;
     }
     if (action === 'stage-create') { processStaged(); return; }
+    /* ── append dupe decision handlers ── */
+    if (action === 'append-dup-cancel') {
+      state.appendDupWarnings    = [];
+      state.appendPendingJobObjs = null;
+      render(); return;
+    }
+    if (action === 'append-dup-skip') {
+      /* remove the duplicate jobs, merge only the genuinely new ones */
+      const dupSet = new Set(state.appendDupWarnings.map(w => String(w).toUpperCase().trim()));
+      const clean  = (state.appendPendingJobObjs || []).filter(j => !dupSet.has(String(j.id).toUpperCase().trim()));
+      state.appendDupWarnings    = [];
+      state.appendPendingJobObjs = null;
+      if (!clean.length) { toast('Nothing new to merge after skipping duplicates'); render(); return; }
+      await doAppendMerge(clean); return;
+    }
+    if (action === 'append-dup-continue') {
+      const jobObjs = state.appendPendingJobObjs || [];
+      state.appendDupWarnings    = [];
+      state.appendPendingJobObjs = null;
+      await doAppendMerge(jobObjs); return;
+    }
     if (action === 'append-load') {
       const raw = document.getElementById('append-code')?.value.trim();
       if (!raw) { toast('Enter a session code'); return; }
@@ -1923,6 +1964,7 @@
   /* ═══════════════════════════════════════════════
      SUPABASE — M1 sessions & checks
   ═══════════════════════════════════════════════ */
+  /* appendToSession — parse files, check for dupe jobs, show banner or proceed */
   async function appendToSession() {
     const target = state.appendTarget;
     const files  = state.stagedFiles;
@@ -1938,34 +1980,68 @@
       try { newJobObjs.push(await parseFile(files[i])); }
       catch (err) { console.error('Parse error:', files[i].name, err); toast(`Could not parse ${files[i].name}`); }
     }
-    if (!newJobObjs.length) { toast('No files parsed successfully'); return; }
+    if (!newJobObjs.length) { toast('No files parsed successfully'); if (prog) prog.style.display = 'none'; return; }
+
+    /* Job-level dupe check — show styled banner, do not proceed silently */
+    const existingJobSet = new Set((target.jobs || []).map(j => String(j).toUpperCase().trim()));
+    const dupJobs = newJobObjs.filter(j => existingJobSet.has(String(j.id).toUpperCase().trim()));
+    if (dupJobs.length) {
+      if (prog) prog.style.display = 'none';
+      state.appendDupWarnings    = dupJobs.map(j => j.id);
+      state.appendPendingJobObjs = newJobObjs;
+      render(); return;
+    }
+
+    await doAppendMerge(newJobObjs);
+  }
+
+  /* doAppendMerge — the actual merge+save, called after dupe check passes */
+  async function doAppendMerge(newJobObjs) {
+    const target = state.appendTarget;
+    const prog = document.getElementById('parse-progress');
+    if (prog) prog.style.display = '';
 
     setProgress(85, 'Merging into existing session…');
 
-    /* Convert existing master_list back into job-like objects for buildMasterList */
-    const existingAsJob = {
-      id: '__existing__',
-      items: target.masterList.map(i => ({
-        name: i.name ? i.name.trim() : i.name,
-        sku: i.sku ? i.sku.trim() : '',
-        qty: i.qty, unit: i.unit || '',
-        fromBundle: i.fromBundle || null,
-      })),
-    };
+    /* Reconstruct existing items per-job from jobQtys so re-appending a job
+       doesn't double-count. Each original job becomes its own job-like object
+       with only its own quantities, matching what buildMasterList expects.    */
+    const existingJobIds = [...new Set(
+      target.masterList.flatMap(i => Object.keys(i.jobQtys || {}))
+    )];
 
-    /* Build merged master list — consolidates dupes automatically */
-    const merged = buildMasterList([existingAsJob, ...newJobObjs]);
+    const existingJobObjs = existingJobIds.length
+      ? existingJobIds.map(jobId => ({
+          id: jobId,
+          items: target.masterList
+            .filter(i => i.jobQtys && i.jobQtys[jobId] != null)
+            .map(i => ({
+              name: i.name ? i.name.trim() : i.name,
+              sku:  i.sku  ? i.sku.trim()  : '',
+              qty:  i.jobQtys[jobId],
+              unit: i.unit || '',
+              fromBundle: i.fromBundle || null,
+            })),
+        }))
+      : [{
+          /* fallback: no jobQtys stored — treat whole list as one existing block */
+          id: '__existing__',
+          items: target.masterList.map(i => ({
+            name: i.name ? i.name.trim() : i.name,
+            sku:  i.sku  ? i.sku.trim()  : '',
+            qty:  i.qty,
+            unit: i.unit || '',
+            fromBundle: i.fromBundle || null,
+          })),
+        }];
 
-    /* Post-merge dupe scan — keys must be unique after consolidation */
-    const _keySet = new Set(); const _dupKeys = [];
-    for (const _item of merged) {
-      if (_keySet.has(_item.key)) _dupKeys.push(_item.key);
-      else _keySet.add(_item.key);
-    }
-    if (_dupKeys.length) {
-      console.warn('appendToSession: duplicate keys after merge:', _dupKeys);
-      toast('⚠ ' + _dupKeys.length + ' duplicate item key(s) found after merge — check console', 5000);
-    }
+    /* Remove jobs being re-appended from the existing set so their quantities
+       come entirely from the fresh PDF, not the old stored value + new value  */
+    const incomingIds = new Set(newJobObjs.map(j => String(j.id).toUpperCase().trim()));
+    const baseJobObjs = existingJobObjs.filter(j => !incomingIds.has(String(j.id).toUpperCase().trim()));
+
+    /* Build merged master list */
+    const merged = buildMasterList([...baseJobObjs, ...newJobObjs]);
 
     /* Merge job refs */
     const newJobIds = newJobObjs.map(j => j.id);
