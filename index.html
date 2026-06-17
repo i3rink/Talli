@@ -26,7 +26,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
   <style>
-    /* ── Version: 2.3.15 ── */
+    /* ── Version: 2.3.16 ── */
 
     :root {
       --teal:        #0075ab;
@@ -500,7 +500,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.3.15';
+  const VERSION = 'v2.3.16';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -2636,8 +2636,12 @@
       };
     });
 
+    const { error: delErr } = await sb.from('pick_completions').delete()
+      .eq('session_id', s.id).eq('job_ref', jobRef);
+    if (delErr) { console.error('M2 delete error:', delErr); toast('Save failed: ' + (delErr.message || 'unknown error')); return; }
+
     const { error } = await sb.from('pick_completions').insert(rows);
-    if (error) { console.error(error); toast('Could not save \u2014 check your connection'); return; }
+    if (error) { console.error('M2 insert error:', error); toast('Save failed: ' + (error.message || 'unknown error')); return; }
 
     if (!state.c2.picks[jobRef]) state.c2.picks[jobRef] = {};
     rows.forEach(r => { state.c2.picks[jobRef][r.item_key] = { qty: r.picked_qty }; });
