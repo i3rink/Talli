@@ -500,7 +500,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.3.17';
+  const VERSION = 'v2.3.18';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1052,7 +1052,6 @@
             <div class="text-muted text-sm">${state.session.code} &middot; ${done}/${total} checked</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-            <button class="btn btn-ghost" data-action="back-to-session">&#8592; Session</button>
             <button class="btn btn-ghost" data-action="go-home">&#8592; Home</button>
             <button class="btn btn-outline" data-action="submit-all" id="submit-all-btn">&#10003; Submit</button>
             <button class="btn btn-primary" data-action="go-report">Report &#8594;</button>
