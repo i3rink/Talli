@@ -500,7 +500,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.3.16';
+  const VERSION = 'v2.3.17';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1052,7 +1052,8 @@
             <div class="text-muted text-sm">${state.session.code} &middot; ${done}/${total} checked</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-            <button class="btn btn-ghost" data-action="go-home">&#8592; Back to Home</button>
+            <button class="btn btn-ghost" data-action="back-to-session">&#8592; Session</button>
+            <button class="btn btn-ghost" data-action="go-home">&#8592; Home</button>
             <button class="btn btn-outline" data-action="submit-all" id="submit-all-btn">&#10003; Submit</button>
             <button class="btn btn-primary" data-action="go-report">Report &#8594;</button>
           </div>
@@ -1596,6 +1597,7 @@
     }
     if (action === 'copy-code')   { navigator.clipboard.writeText(state.session.code).then(() => toast('Code copied!')); return; }
     if (action === 'go-check')    { state.view = 'check';  render(); return; }
+    if (action === 'back-to-session') { state.view = 'session'; render(); return; }
     if (action === 'go-report')   { state.view = 'report'; render(); return; }
     if (action === 'back-upload') { state.view = 'upload'; render(); return; }
     if (action === 'new-session') { state.session = null; state.checks = {}; state.stagedFiles = []; state.view = 'upload'; render(); return; }
@@ -2143,7 +2145,7 @@
         status:     state.checks[item.key].status,
         have_qty:   state.checks[item.key].haveQty || null,
       }));
-      const { error } = await sb.from('checks').insert(rows);
+      const { error } = await sb.from('checks').upsert(rows, { onConflict: 'session_id,item_key' });
       if (error) throw error;
       toast('✓ Saved — ' + rows.length + ' item' + (rows.length !== 1 ? 's' : '') + ' recorded in Supabase', 4000);
     } catch (err) {
@@ -2156,7 +2158,10 @@
   async function pushCheck(key) {
     if (!state.session?.id || state.session.id === 'local') return;
     const c = state.checks[key];
-    await sb.from('checks').insert({ session_id: state.session.id, item_key: key, status: c?.status || null, have_qty: c?.haveQty || null });
+    await sb.from('checks').upsert(
+      { session_id: state.session.id, item_key: key, status: c?.status || null, have_qty: c?.haveQty || null, updated_at: new Date().toISOString() },
+      { onConflict: 'session_id,item_key' }
+    );
   }
 
   /* ═══════════════════════════════════════════════
