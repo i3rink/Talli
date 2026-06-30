@@ -310,7 +310,15 @@
     .c4-item-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
     .c4-item-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
     .c4-item-name { font-size: .9rem; }
-    .c4-item-row .qty-input { width: 72px; flex-shrink: 0; }
+    .c4-item-row .qty-input { width: 60px; flex-shrink: 0; text-align: center; }
+    .c4-stepper { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .c4-step-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg); font-size: 1.1rem; line-height: 1; cursor: pointer; }
+    .c4-step-btn:active { background: var(--border); }
+    .c4-item-row-bo { background: #fff7ed; border-radius: 8px; padding-left: 8px; }
+    .c4-bo-tag { font-size: .72rem; color: #c2410c; margin-top: 3px; cursor: pointer; }
+    .c4-bo-add { font-size: .72rem; color: var(--muted); background: none; border: none; padding: 0; margin-top: 3px; cursor: pointer; text-decoration: underline; }
+    .c4-bo-form { display: flex; gap: 6px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
+    .c4-bo-form .text-input { padding: 6px 8px; font-size: .8rem; }
 
     /* ── Coming-soon banner ── */
     .cs-banner {
@@ -507,7 +515,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.4.0';
+  const VERSION = 'v2.5.0';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1401,16 +1409,35 @@
     const countedTotal = items.filter(i => i.current_qty !== null && i.current_qty !== undefined).length;
 
     const sections = groupKeys.map(g => {
-      const rows = groups[g].map(i => `
-        <div class="c4-item-row">
+      const rows = groups[g].map(i => {
+        const isBackordered = !!i.backorder_until;
+        const boTag = isBackordered
+          ? `<div class="c4-bo-tag" data-action="c4-bo-open" data-id="${esc(i.id)}">Back order &mdash; due ${esc(formatDateUK(i.backorder_until))}${i.backorder_note ? `: ${esc(i.backorder_note)}` : ''}</div>`
+          : `<button class="c4-bo-add" data-action="c4-bo-open" data-id="${esc(i.id)}">+ Back order</button>`;
+        const boForm = state.c4.boOpenId === i.id ? `
+          <div class="c4-bo-form">
+            <input class="text-input" type="date" data-action="c4-bo-date" data-id="${esc(i.id)}" value="${i.backorder_until || ''}" />
+            <input class="text-input" type="text" placeholder="Note (optional)" data-action="c4-bo-note" data-id="${esc(i.id)}" value="${esc(i.backorder_note || '')}" style="flex:1;" />
+            <button class="btn btn-ghost" data-action="c4-bo-save" data-id="${esc(i.id)}">Save</button>
+            ${isBackordered ? `<button class="btn btn-ghost" data-action="c4-bo-clear" data-id="${esc(i.id)}">Clear</button>` : ''}
+          </div>` : '';
+        return `
+        <div class="c4-item-row${isBackordered ? ' c4-item-row-bo' : ''}">
           <div class="c4-item-info">
             <div class="c4-item-name">${esc(i.name)}</div>
             ${i.sku ? `<span class="item-sku">${esc(i.sku)}</span>` : ''}
+            ${boTag}
+            ${boForm}
           </div>
-          <input class="qty-input" type="tel" inputmode="numeric" placeholder="Qty"
-            value="${i.current_qty ?? ''}"
-            data-action="c4-qty-input" data-id="${esc(i.id)}" />
-        </div>`).join('');
+          <div class="c4-stepper">
+            <button class="c4-step-btn" data-action="c4-step" data-id="${esc(i.id)}" data-dir="-1">&minus;</button>
+            <input class="qty-input" type="tel" inputmode="numeric" placeholder="Qty"
+              value="${i.current_qty ?? ''}"
+              data-action="c4-qty-input" data-id="${esc(i.id)}" />
+            <button class="c4-step-btn" data-action="c4-step" data-id="${esc(i.id)}" data-dir="1">&plus;</button>
+          </div>
+        </div>`;
+      }).join('');
       return `<div class="c4-group">
         <div class="c4-group-title">${esc(g)}</div>
         ${rows}
@@ -1428,6 +1455,12 @@
       </div>`;
   }
 
+  function formatDateUK(iso) {
+    if (!iso) return '';
+    const [y, m, d] = iso.split('-');
+    return `${d}/${m}/${y}`;
+  }
+
   let c4SaveTimers = {};
   function queueC4Save(id, qty) {
     clearTimeout(c4SaveTimers[id]);
@@ -1435,14 +1468,64 @@
   }
   async function saveC4Qty(id, qty) {
     const val = qty === '' ? null : Number(qty);
+    const countedBy = state.role || 'warehouse';
+    const countedAt = new Date().toISOString();
     const { error } = await sb.from('stock_items').update({
       current_qty: val,
-      counted_by:  state.role || 'warehouse',
-      counted_at:  new Date().toISOString(),
+      counted_by:  countedBy,
+      counted_at:  countedAt,
     }).eq('id', id);
     if (error) { toast('Save failed — check connection'); return; }
     const item = (state.c4.items || []).find(i => i.id === id);
     if (item) item.current_qty = val;
+    /* count history — append only, never blocks the main save if it fails */
+    sb.from('stock_count_log').insert({ item_id: id, qty: val, counted_by: countedBy, counted_at: countedAt });
+  }
+
+  function stepC4Qty(id, dir) {
+    const item = (state.c4.items || []).find(i => i.id === id);
+    if (!item) return;
+    const current = Number(item.current_qty) || 0;
+    const next = Math.max(0, current + dir);
+    item.current_qty = next;
+    render();
+    saveC4Qty(id, String(next));
+  }
+
+  function toggleBoForm(id) {
+    state.c4.boOpenId = state.c4.boOpenId === id ? null : id;
+    render();
+  }
+
+  async function saveBackorder(id) {
+    const dateEl = document.querySelector(`[data-action="c4-bo-date"][data-id="${id}"]`);
+    const noteEl = document.querySelector(`[data-action="c4-bo-note"][data-id="${id}"]`);
+    const dateVal = dateEl ? dateEl.value : '';
+    const noteVal = noteEl ? noteEl.value.trim() : '';
+    if (!dateVal) { toast('Pick a date first'); return; }
+    const { error } = await sb.from('stock_items').update({
+      backorder_until: dateVal,
+      backorder_note: noteVal || null,
+      backorder_logged_by: state.role || 'office',
+      backorder_logged_at: new Date().toISOString(),
+    }).eq('id', id);
+    if (error) { toast('Save failed — check connection'); return; }
+    const item = (state.c4.items || []).find(i => i.id === id);
+    if (item) { item.backorder_until = dateVal; item.backorder_note = noteVal || null; }
+    state.c4.boOpenId = null;
+    render();
+    toast('Back order logged');
+  }
+
+  async function clearBackorder(id) {
+    const { error } = await sb.from('stock_items').update({
+      backorder_until: null, backorder_note: null,
+    }).eq('id', id);
+    if (error) { toast('Save failed — check connection'); return; }
+    const item = (state.c4.items || []).find(i => i.id === id);
+    if (item) { item.backorder_until = null; item.backorder_note = null; }
+    state.c4.boOpenId = null;
+    render();
   }
 
   /* ═══════════════════════════════════════════════
@@ -1489,6 +1572,22 @@
       state.module = 'home'; state.view = 'home';
       state.dash = { loading: true, m1: [], m2: [], m3: [] };
       render(); return;
+    }
+    if (action === 'c4-step') {
+      stepC4Qty(btn.dataset.id, Number(btn.dataset.dir));
+      return;
+    }
+    if (action === 'c4-bo-open') {
+      toggleBoForm(btn.dataset.id);
+      return;
+    }
+    if (action === 'c4-bo-save') {
+      saveBackorder(btn.dataset.id);
+      return;
+    }
+    if (action === 'c4-bo-clear') {
+      clearBackorder(btn.dataset.id);
+      return;
     }
     if (action === 'c4-open-cat') {
       state.c4.cat = btn.dataset.cat;
@@ -2454,7 +2553,20 @@
       const { data: alts } = await sb.from('alternatives')
         .select('*').eq('status', 'pending').order('updated_at', { ascending: false }).limit(100);
 
-      state.dash = { loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()], alts: alts || [] };
+      /* ── Stock checker summary ── */
+      const { data: stockRows } = await sb.from('stock_items').select('*');
+      const stock = stockRows || [];
+      const stockCounted = stock.filter(i => i.current_qty !== null && i.current_qty !== undefined).length;
+      const stockLow = stock.filter(i =>
+        i.current_qty !== null && i.current_qty !== undefined &&
+        i.low_stock_qty !== null && i.low_stock_qty !== undefined &&
+        Number(i.current_qty) <= Number(i.low_stock_qty));
+      const stockBackorder = stock.filter(i => !!i.backorder_until);
+
+      state.dash = {
+        loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()], alts: alts || [],
+        stockTotal: stock.length, stockCounted, stockLow, stockBackorder,
+      };
       el.innerHTML = renderDashboardContent();
     } catch (err) {
       console.error('Dashboard error:', err);
@@ -2462,18 +2574,46 @@
     }
   }
 
+  function renderStockDashSection() {
+    const { stockTotal, stockCounted, stockLow, stockBackorder } = state.dash;
+    if (!stockTotal) return '';
+    const lowRows = (stockLow || []).map(i => `
+      <div class="dash-item">
+        <div class="dash-item-name">${esc(i.name)}</div>
+        ${i.sku ? `<span class="dash-item-detail">${esc(i.sku)}</span>` : ''}
+        <span class="dash-item-short">${i.current_qty} in stock &mdash; min ${i.low_stock_qty}</span>
+      </div>`).join('');
+    const boRows = (stockBackorder || []).map(i => `
+      <div class="dash-item" style="flex-wrap:wrap;">
+        <div class="dash-item-name" style="white-space:normal;">${esc(i.name)}</div>
+        ${i.sku ? `<span class="dash-item-detail">${esc(i.sku)}</span>` : ''}
+        <span class="dash-item-short" style="background:#fed7aa;color:#c2410c;">Due ${esc(formatDateUK(i.backorder_until))}</span>
+        ${i.backorder_note ? `<div style="width:100%;font-size:.78rem;color:var(--muted);">${esc(i.backorder_note)}</div>` : ''}
+      </div>`).join('');
+    return `<div class="dash-section">
+      <div class="dash-section-head">
+        <div class="dash-stripe" style="background:#7c3aed;"></div>
+        <div class="dash-section-title">Stock Checker</div>
+        <span class="dash-count" style="background:#ede9fe;color:#7c3aed;">${stockCounted} of ${stockTotal} counted</span>
+      </div>
+      ${lowRows ? `<div class="dash-item" style="font-weight:700;border-bottom:none;padding-bottom:0;">Low stock</div>${lowRows}` : `<div class="dash-item text-muted text-sm">No items below their low stock threshold.</div>`}
+      ${boRows ? `<div class="dash-item" style="font-weight:700;border-bottom:none;padding-bottom:0;margin-top:6px;">Back order</div>${boRows}` : ''}
+    </div>`;
+  }
+
   function renderDashboardContent() {
     const { m1, m2, m3 } = state.dash;
     const m1Count = m1.reduce((s, g) => s + g.items.length, 0);
     const m2Count = m2.reduce((s, [, rows]) => s + rows.length, 0);
     const m3Count = m3.reduce((s, [, rows]) => s + rows.length, 0);
+    const stockHtml = renderStockDashSection();
 
     if (!m1Count && !m2Count && !m3Count) {
       return `<div class="dash-clear">
         <div class="dash-clear-icon">&#10003;</div>
         <div style="font-weight:700;color:var(--green);margin-bottom:4px;">All clear</div>
         <div class="text-muted text-sm">No outstanding shortfalls across any module.</div>
-      </div>`;
+      </div>` + stockHtml;
     }
 
     /* ── M1: expandable per-session ── */
@@ -2618,7 +2758,7 @@
       </div>`;
     }
 
-    return altHtml + m1Html + m2Html + m3Html;
+    return altHtml + m1Html + m2Html + m3Html + stockHtml;
   }
 
   /* ── Dashboard copy functions ── */
