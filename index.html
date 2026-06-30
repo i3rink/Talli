@@ -304,6 +304,13 @@
     .c4-cat-name { font-family: 'Bricolage Grotesque', sans-serif; font-size: .8rem; font-weight: 700; color: var(--text); }
     .c4-cat-freq { font-size: .7rem; color: var(--muted); margin-top: 2px; }
     .c4-cat-count { font-size: .7rem; color: var(--muted); margin-top: 4px; background: var(--border); border-radius: 20px; display: inline-block; padding: 1px 8px; }
+    .text-input { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: .95rem; font-family: inherit; }
+    .c4-group { margin-bottom: 18px; }
+    .c4-group-title { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 8px; }
+    .c4-item-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .c4-item-info { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+    .c4-item-name { font-size: .9rem; }
+    .c4-item-row .qty-input { width: 72px; flex-shrink: 0; }
 
     /* ── Coming-soon banner ── */
     .cs-banner {
@@ -500,7 +507,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.3.18';
+  const VERSION = 'v2.4.0';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -610,6 +617,14 @@
     else if (v === 'c3-check') root.innerHTML = renderC3Check();
     else if (v === 'c3-done')  root.innerHTML = renderC3Done();
     else if (v === 'c4-overview') root.innerHTML = renderC4Overview();
+    else if (v === 'c4-category') {
+      root.innerHTML = renderC4Category();
+      const s = document.querySelector('[data-action="c4-search"]');
+      if (s && state.c4.searchFocused) {
+        s.focus();
+        s.setSelectionRange(s.value.length, s.value.length);
+      }
+    }
     bindEvents();
   }
 
@@ -1314,37 +1329,120 @@
      MODULE 4 — STOCK CHECKER (scaffold)
   ═══════════════════════════════════════════════ */
   const C4_CATS = [
-    { key: 'wall_floor',  name: 'Wall & Floor',  icon: '&#9638;', freq: 'Monthly' },
-    { key: 'wet_areas',   name: 'Wet Areas',     icon: '&#9711;', freq: 'Fortnightly' },
-    { key: 'glassware',   name: 'Glassware',     icon: '&#9671;', freq: 'Monthly' },
-    { key: 'brassware',   name: 'Brassware',     icon: '&#9672;', freq: 'Fortnightly' },
-    { key: 'furniture',   name: 'Furniture',     icon: '&#9636;', freq: 'Monthly' },
-    { key: 'consumables', name: 'Consumables',   icon: '&#9637;', freq: 'Weekly' },
+    { key: 'wall_floor',  name: 'Wall & Floor',  icon: '&#9638;' },
+    { key: 'wet_areas',   name: 'Wet Areas',     icon: '&#9711;' },
+    { key: 'glassware',   name: 'Glassware',     icon: '&#9671;' },
+    { key: 'brassware',   name: 'Brassware',     icon: '&#9672;' },
+    { key: 'furniture',   name: 'Furniture',     icon: '&#9636;' },
+    { key: 'sundries',    name: 'Sundries',      icon: '&#9637;' },
   ];
 
+  async function loadC4Counts() {
+    if (state.c4.counts) return;
+    state.c4.counts = {};
+    const { data, error } = await sb.from('stock_items').select('category');
+    if (error) { toast('Could not load stock categories'); return; }
+    (data || []).forEach(row => {
+      state.c4.counts[row.category] = (state.c4.counts[row.category] || 0) + 1;
+    });
+  }
+
   function renderC4Overview() {
-    const catCards = C4_CATS.map(c => `
-      <div class="c4-cat">
+    const counts = state.c4.counts || {};
+    const catCards = C4_CATS.map(c => {
+      const n = counts[c.key] || 0;
+      return `
+      <div class="c4-cat" data-action="c4-open-cat" data-cat="${c.key}" style="cursor:pointer;${n === 0 ? 'opacity:.5' : ''}">
         <div class="c4-cat-icon">${c.icon}</div>
         <div class="c4-cat-name">${esc(c.name)}</div>
-        <div class="c4-cat-freq">${c.freq}</div>
-        <div class="c4-cat-count">0 items</div>
-      </div>`).join('');
+        <div class="c4-cat-count">${n} item${n === 1 ? '' : 's'}</div>
+      </div>`;
+    }).join('');
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
       <div class="card">
         <div class="card-title">Stock Checker</div>
-        <div class="cs-banner">
-          <div class="cs-banner-title">Coming soon</div>
-          <div class="cs-banner-body">Stock lists are being populated. This module will be ready once the category lists are set up. The structure below shows how it will work.</div>
-        </div>
+        <p class="text-muted text-sm" style="margin-bottom:12px;">Pick a category, find the product, enter what's currently on the shelf.</p>
         <div class="c4-grid">${catCards}</div>
-        <div class="flex gap-2 flex-wrap mt-4">
-          <button class="btn btn-ghost" disabled>Start Count</button>
-          <button class="btn btn-ghost" disabled>Review Variances</button>
-          <button class="btn btn-ghost" disabled>Audit Trail</button>
-        </div>
       </div>`;
+  }
+
+  /* ── category item list — count entry screen ── */
+  async function loadC4Items(cat) {
+    state.c4.loading = true;
+    render();
+    const { data, error } = await sb.from('stock_items')
+      .select('*').eq('category', cat).order('sub_category').order('name');
+    state.c4.loading = false;
+    if (error) { toast('Could not load items'); state.c4.items = []; return; }
+    state.c4.items = data || [];
+  }
+
+  function renderC4Category() {
+    const cat = C4_CATS.find(c => c.key === state.c4.cat);
+    if (state.c4.loading) {
+      return `<div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-overview">&#8592; Categories</button></div>
+        <div class="card"><p class="text-muted">Loading items&hellip;</p></div>`;
+    }
+    const items = state.c4.items || [];
+    const q = (state.c4.search || '').toLowerCase().trim();
+    const filtered = q
+      ? items.filter(i => (i.name || '').toLowerCase().includes(q) || (i.sku || '').toLowerCase().includes(q))
+      : items;
+
+    /* group by sub_category */
+    const groups = {};
+    filtered.forEach(i => {
+      const g = i.sub_category || 'Other';
+      (groups[g] = groups[g] || []).push(i);
+    });
+    const groupKeys = Object.keys(groups).sort();
+
+    const countedTotal = items.filter(i => i.current_qty !== null && i.current_qty !== undefined).length;
+
+    const sections = groupKeys.map(g => {
+      const rows = groups[g].map(i => `
+        <div class="c4-item-row">
+          <div class="c4-item-info">
+            <div class="c4-item-name">${esc(i.name)}</div>
+            ${i.sku ? `<span class="item-sku">${esc(i.sku)}</span>` : ''}
+          </div>
+          <input class="qty-input" type="tel" inputmode="numeric" placeholder="Qty"
+            value="${i.current_qty ?? ''}"
+            data-action="c4-qty-input" data-id="${esc(i.id)}" />
+        </div>`).join('');
+      return `<div class="c4-group">
+        <div class="c4-group-title">${esc(g)}</div>
+        ${rows}
+      </div>`;
+    }).join('') || `<div class="empty-state"><div class="icon">&#128269;</div><p>No items match</p></div>`;
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-overview">&#8592; Categories</button></div>
+      <div class="card">
+        <div class="card-title">${esc(cat ? cat.name : '')}</div>
+        <p class="text-muted text-sm" style="margin-bottom:8px;">${countedTotal} of ${items.length} counted</p>
+        <input class="text-input" type="text" placeholder="Search by name or SKU&hellip;"
+          value="${esc(state.c4.search || '')}" data-action="c4-search" style="margin-bottom:14px;width:100%;" />
+        ${sections}
+      </div>`;
+  }
+
+  let c4SaveTimers = {};
+  function queueC4Save(id, qty) {
+    clearTimeout(c4SaveTimers[id]);
+    c4SaveTimers[id] = setTimeout(() => saveC4Qty(id, qty), 500);
+  }
+  async function saveC4Qty(id, qty) {
+    const val = qty === '' ? null : Number(qty);
+    const { error } = await sb.from('stock_items').update({
+      current_qty: val,
+      counted_by:  state.role || 'warehouse',
+      counted_at:  new Date().toISOString(),
+    }).eq('id', id);
+    if (error) { toast('Save failed — check connection'); return; }
+    const item = (state.c4.items || []).find(i => i.id === id);
+    if (item) item.current_qty = val;
   }
 
   /* ═══════════════════════════════════════════════
@@ -1379,7 +1477,7 @@
       if (mod === 'verifier')   { state.view = 'upload'; }
       if (mod === 'completion') { state.view = 'c2-home'; }
       if (mod === 'delivery')   { state.view = 'c3-home'; }
-      if (mod === 'stock')      { state.view = 'c4-overview'; }
+      if (mod === 'stock')      { state.view = 'c4-overview'; loadC4Counts().then(render); }
       render(); return;
     }
     /* ── upload-cancel: clears staging/append state, returns home without wiping M2/M3 ── */
@@ -1391,6 +1489,24 @@
       state.module = 'home'; state.view = 'home';
       state.dash = { loading: true, m1: [], m2: [], m3: [] };
       render(); return;
+    }
+    if (action === 'c4-open-cat') {
+      state.c4.cat = btn.dataset.cat;
+      state.c4.items = [];
+      state.c4.search = '';
+      state.view = 'c4-category';
+      render();
+      await loadC4Items(btn.dataset.cat);
+      render();
+      return;
+    }
+    if (action === 'c4-back-overview') {
+      state.c4.counts = null; /* refresh counts */
+      state.view = 'c4-overview';
+      render();
+      await loadC4Counts();
+      render();
+      return;
     }
     if (action === 'go-home') {
       state.module = 'home'; state.view = 'home';
@@ -1690,12 +1806,26 @@
   /* ═══════════════════════════════════════════════
      GLOBAL CHANGE + KEYDOWN HANDLERS
   ═══════════════════════════════════════════════ */
+  document.addEventListener('input', e => {
+    if (e.target.dataset.action === 'c4-search') {
+      state.c4.search = e.target.value;
+      state.c4.searchFocused = true;
+      render();
+    }
+  });
+
   document.addEventListener('keydown', e => {
     if (e.key === 'Enter' && e.target.id === 'dash-pin-input') { e.preventDefault(); tryDashUnlock(); }
   });
 
   document.addEventListener('change', e => {
     if (e.target.id === 'file-input') { handleFiles([...e.target.files]); return; }
+    if (e.target.dataset.action === 'c4-qty-input') {
+      const id  = e.target.dataset.id;
+      const val = e.target.value.trim();
+      queueC4Save(id, val);
+      return;
+    }
     if (e.target.dataset.action === 'qty-input') {
       const key = e.target.dataset.key;
       if (state.checks[key]) { state.checks[key].haveQty = Number(e.target.value); pushCheck(key); }
