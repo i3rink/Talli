@@ -319,6 +319,12 @@
     .c4-bo-add { font-size: .72rem; color: var(--muted); background: none; border: none; padding: 0; margin-top: 3px; cursor: pointer; text-decoration: underline; }
     .c4-bo-form { display: flex; gap: 6px; align-items: center; margin-top: 6px; flex-wrap: wrap; }
     .c4-bo-form .text-input { padding: 6px 8px; font-size: .8rem; }
+    .stock-add-form { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--bg); border-radius: 8px; margin-top: 4px; }
+    .stock-add-form .text-input { width: 100%; }
+    .c4-item-row-oos { opacity: .65; }
+    .c4-oos-tag { font-size: .72rem; color: var(--red); font-weight: 700; margin-top: 3px; display: block; }
+    .stock-oos-mark-form { width: 100%; margin-top: 6px; padding: 10px; background: #fef2f2; border-radius: 8px; }
+    .stock-oos-mark-form .text-input { width: 100%; padding: 6px 8px; font-size: .82rem; }
 
     /* ── Coming-soon banner ── */
     .cs-banner {
@@ -515,7 +521,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.5.0';
+  const VERSION = 'v2.8.0';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1422,10 +1428,11 @@
             ${isBackordered ? `<button class="btn btn-ghost" data-action="c4-bo-clear" data-id="${esc(i.id)}">Clear</button>` : ''}
           </div>` : '';
         return `
-        <div class="c4-item-row${isBackordered ? ' c4-item-row-bo' : ''}">
+        <div class="c4-item-row${isBackordered ? ' c4-item-row-bo' : ''}${i.out_of_stock ? ' c4-item-row-oos' : ''}">
           <div class="c4-item-info">
             <div class="c4-item-name">${esc(i.name)}</div>
             ${i.sku ? `<span class="item-sku">${esc(i.sku)}</span>` : ''}
+            ${i.out_of_stock ? `<span class="c4-oos-tag">Out of stock${i.oos_expected_label ? ' &mdash; ' + esc(i.oos_expected_label) : ''}</span>` : ''}
             ${boTag}
             ${boForm}
           </div>
@@ -1572,6 +1579,51 @@
       state.module = 'home'; state.view = 'home';
       state.dash = { loading: true, m1: [], m2: [], m3: [] };
       render(); return;
+    }
+    if (action === 'stock-oos-open') {
+      state.dash.oosOpen = true;
+      state.dash.oosSearch = '';
+      const dashEl = document.getElementById('dashboard');
+      if (dashEl) dashEl.innerHTML = renderDashboardContent();
+      return;
+    }
+    if (action === 'stock-oos-close') {
+      state.dash.oosOpen = false;
+      const dashEl = document.getElementById('dashboard');
+      if (dashEl) dashEl.innerHTML = renderDashboardContent();
+      return;
+    }
+    if (action === 'stock-oos-mark-open') {
+      openOosMarkForm(btn.dataset.id);
+      return;
+    }
+    if (action === 'stock-oos-mark-cancel') {
+      closeOosMarkForm();
+      return;
+    }
+    if (action === 'stock-oos-confirm') {
+      confirmOosMark(btn.dataset.id);
+      return;
+    }
+    if (action === 'stock-toggle-oos') {
+      toggleOosItem(btn.dataset.id, btn.dataset.current === '1');
+      return;
+    }
+    if (action === 'stock-add-open') {
+      state.dash.addItemOpen = true;
+      const dashEl = document.getElementById('dashboard');
+      if (dashEl) dashEl.innerHTML = renderDashboardContent();
+      return;
+    }
+    if (action === 'stock-add-cancel') {
+      state.dash.addItemOpen = false;
+      const dashEl = document.getElementById('dashboard');
+      if (dashEl) dashEl.innerHTML = renderDashboardContent();
+      return;
+    }
+    if (action === 'stock-add-save') {
+      saveStockAddItem();
+      return;
     }
     if (action === 'c4-step') {
       stepC4Qty(btn.dataset.id, Number(btn.dataset.dir));
@@ -1911,6 +1963,15 @@
       state.c4.searchFocused = true;
       render();
     }
+    if (e.target.dataset.action === 'stock-oos-search') {
+      state.dash.oosSearch = e.target.value;
+      const dashEl = document.getElementById('dashboard');
+      if (dashEl) {
+        dashEl.innerHTML = renderDashboardContent();
+        const s = dashEl.querySelector('[data-action="stock-oos-search"]');
+        if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
+      }
+    }
   });
 
   document.addEventListener('keydown', e => {
@@ -1918,6 +1979,12 @@
   });
 
   document.addEventListener('change', e => {
+    if (e.target.id && e.target.id.startsWith('oos-expected-') && !e.target.id.includes('custom')) {
+      const id = e.target.id.replace('oos-expected-', '');
+      const customEl = document.getElementById(`oos-expected-custom-${id}`);
+      if (customEl) customEl.style.display = e.target.value === 'custom' ? 'block' : 'none';
+      return;
+    }
     if (e.target.id === 'file-input') { handleFiles([...e.target.files]); return; }
     if (e.target.dataset.action === 'c4-qty-input') {
       const id  = e.target.dataset.id;
@@ -2565,7 +2632,7 @@
 
       state.dash = {
         loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()], alts: alts || [],
-        stockTotal: stock.length, stockCounted, stockLow, stockBackorder,
+        stockTotal: stock.length, stockCounted, stockLow, stockBackorder, stockAll: stock,
       };
       el.innerHTML = renderDashboardContent();
     } catch (err) {
@@ -2590,6 +2657,71 @@
         <span class="dash-item-short" style="background:#fed7aa;color:#c2410c;">Due ${esc(formatDateUK(i.backorder_until))}</span>
         ${i.backorder_note ? `<div style="width:100%;font-size:.78rem;color:var(--muted);">${esc(i.backorder_note)}</div>` : ''}
       </div>`).join('');
+    const catOptions = C4_CATS.map(c => `<option value="${c.key}">${esc(c.name)}</option>`).join('');
+    const addForm = state.dash.addItemOpen ? `
+      <div class="stock-add-form">
+        <select class="text-input" id="stock-add-cat">${catOptions}</select>
+        <input class="text-input" id="stock-add-sub" type="text" placeholder="Sub-category (e.g. Trims)" />
+        <input class="text-input" id="stock-add-sku" type="text" placeholder="SKU (optional)" />
+        <input class="text-input" id="stock-add-name" type="text" placeholder="Product name" />
+        <input class="text-input" id="stock-add-low" type="number" min="0" placeholder="Low stock qty (optional)" />
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <button class="btn btn-primary" data-action="stock-add-save" style="padding:6px 14px;font-size:.82rem;">Add item</button>
+          <button class="btn btn-ghost" data-action="stock-add-cancel" style="padding:6px 14px;font-size:.82rem;">Cancel</button>
+        </div>
+        <div id="stock-add-error" style="color:var(--red);font-size:.78rem;margin-top:6px;min-height:16px;"></div>
+      </div>` : '';
+
+    /* out-of-stock search + toggle — SKU-priority matching */
+    const oosQuery = (state.dash.oosSearch || '').toLowerCase().trim();
+    let oosMatches = [];
+    if (oosQuery) {
+      const all = state.dash.stockAll || [];
+      const skuExact   = all.filter(i => (i.sku || '').toLowerCase() === oosQuery);
+      const skuStarts  = all.filter(i => (i.sku || '').toLowerCase().startsWith(oosQuery) && !skuExact.includes(i));
+      const skuContains = all.filter(i => (i.sku || '').toLowerCase().includes(oosQuery) && !skuExact.includes(i) && !skuStarts.includes(i));
+      const nameMatches = all.filter(i =>
+        (i.name || '').toLowerCase().includes(oosQuery) &&
+        !skuExact.includes(i) && !skuStarts.includes(i) && !skuContains.includes(i));
+      oosMatches = [...skuExact, ...skuStarts, ...skuContains, ...nameMatches].slice(0, 10);
+    }
+    const oosResultRows = oosMatches.map(i => {
+      const isOos = !!i.out_of_stock;
+      const showMarkForm = state.dash.oosMarkFormId === i.id;
+      const markForm = showMarkForm ? `
+        <div class="stock-oos-mark-form">
+          <select class="text-input" id="oos-expected-${i.id}">
+            <option value="1m">Back in ~1 month</option>
+            <option value="2m">Back in ~2 months</option>
+            <option value="3m">Back in ~3 months</option>
+            <option value="never">Never &mdash; end of line</option>
+            <option value="custom">Custom date / note</option>
+          </select>
+          <input class="text-input" id="oos-expected-custom-${i.id}" type="text" placeholder="e.g. mid September, or a date" style="display:none;" />
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <button class="btn btn-primary" data-action="stock-oos-confirm" data-id="${esc(i.id)}" style="padding:4px 12px;font-size:.78rem;">Confirm out of stock</button>
+            <button class="btn btn-ghost" data-action="stock-oos-mark-cancel" style="padding:4px 12px;font-size:.78rem;">Cancel</button>
+          </div>
+        </div>` : '';
+      return `
+      <div class="dash-item" style="flex-wrap:wrap;">
+        <div class="dash-item-name" style="white-space:normal;">${esc(i.name)}</div>
+        ${i.sku ? `<span class="dash-item-detail">${esc(i.sku)}</span>` : ''}
+        ${isOos ? `<span class="dash-item-short" style="background:#fecaca;color:var(--red);">Out of stock${i.oos_expected_label ? ' &mdash; ' + esc(i.oos_expected_label) : ''}</span>` : ''}
+        ${isOos
+          ? `<button class="btn btn-ghost" data-action="stock-toggle-oos" data-id="${esc(i.id)}" data-current="1" style="padding:4px 12px;font-size:.78rem;color:var(--green);">Mark back in stock</button>`
+          : showMarkForm ? '' : `<button class="btn btn-ghost" data-action="stock-oos-mark-open" data-id="${esc(i.id)}" style="padding:4px 12px;font-size:.78rem;color:var(--red);">Mark out of stock</button>`}
+        ${markForm}
+      </div>`;
+    }).join('');
+    const oosOpen = state.dash.oosOpen ? `
+      <div class="stock-add-form">
+        <input class="text-input" type="text" placeholder="Search by SKU or name&hellip;"
+          value="${esc(state.dash.oosSearch || '')}" data-action="stock-oos-search" autofocus />
+        ${oosResultRows || (oosQuery ? `<div class="text-muted text-sm">No matches</div>` : '')}
+        <button class="btn btn-ghost" data-action="stock-oos-close" style="margin-top:6px;padding:4px 12px;font-size:.78rem;align-self:flex-start;">Close</button>
+      </div>` : '';
+
     return `<div class="dash-section">
       <div class="dash-section-head">
         <div class="dash-stripe" style="background:#7c3aed;"></div>
@@ -2598,7 +2730,89 @@
       </div>
       ${lowRows ? `<div class="dash-item" style="font-weight:700;border-bottom:none;padding-bottom:0;">Low stock</div>${lowRows}` : `<div class="dash-item text-muted text-sm">No items below their low stock threshold.</div>`}
       ${boRows ? `<div class="dash-item" style="font-weight:700;border-bottom:none;padding-bottom:0;margin-top:6px;">Back order</div>${boRows}` : ''}
+      <div class="dash-footer" style="flex-wrap:wrap;gap:8px;">
+        ${state.dash.addItemOpen ? addForm : `<button class="btn btn-ghost" data-action="stock-add-open" style="font-size:.8rem;padding:6px 14px;">&#43; Add stock item</button>`}
+        ${state.dash.oosOpen ? '' : `<button class="btn btn-ghost" data-action="stock-oos-open" style="font-size:.8rem;padding:6px 14px;">Mark item out of stock</button>`}
+      </div>
+      ${oosOpen}
     </div>`;
+  }
+
+  async function toggleOosItem(id, currentlyOos) {
+    /* this path only runs for "mark back in stock" now — going out of stock uses the mark form */
+    const { error } = await sb.from('stock_items').update({
+      out_of_stock: false, oos_expected_date: null, oos_expected_label: null,
+    }).eq('id', id);
+    if (error) { toast('Save failed — check connection'); return; }
+    const item = (state.dash.stockAll || []).find(i => i.id === id);
+    if (item) { item.out_of_stock = false; item.oos_expected_date = null; item.oos_expected_label = null; }
+    toast('Marked back in stock');
+    const dashEl = document.getElementById('dashboard');
+    if (dashEl) dashEl.innerHTML = renderDashboardContent();
+  }
+
+  function openOosMarkForm(id) {
+    state.dash.oosMarkFormId = id;
+    const dashEl = document.getElementById('dashboard');
+    if (dashEl) dashEl.innerHTML = renderDashboardContent();
+  }
+
+  function closeOosMarkForm() {
+    state.dash.oosMarkFormId = null;
+    const dashEl = document.getElementById('dashboard');
+    if (dashEl) dashEl.innerHTML = renderDashboardContent();
+  }
+
+  function addMonthsLabel(n) {
+    const d = new Date();
+    d.setMonth(d.getMonth() + n);
+    return d.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+  }
+
+  async function confirmOosMark(id) {
+    const sel = document.getElementById(`oos-expected-${id}`);
+    const customEl = document.getElementById(`oos-expected-custom-${id}`);
+    const choice = sel ? sel.value : '1m';
+    let label = '';
+    let dateVal = null;
+    if (choice === '1m') { label = `Expected ${addMonthsLabel(1)}`; }
+    else if (choice === '2m') { label = `Expected ${addMonthsLabel(2)}`; }
+    else if (choice === '3m') { label = `Expected ${addMonthsLabel(3)}`; }
+    else if (choice === 'never') { label = 'Never \u2014 end of line'; }
+    else if (choice === 'custom') { label = (customEl ? customEl.value.trim() : '') || 'Date to be confirmed'; }
+    const { error } = await sb.from('stock_items').update({
+      out_of_stock: true, oos_expected_date: dateVal, oos_expected_label: label,
+    }).eq('id', id);
+    if (error) { toast('Save failed — check connection'); return; }
+    const item = (state.dash.stockAll || []).find(i => i.id === id);
+    if (item) { item.out_of_stock = true; item.oos_expected_date = dateVal; item.oos_expected_label = label; }
+    state.dash.oosMarkFormId = null;
+    toast('Marked out of stock');
+    const dashEl = document.getElementById('dashboard');
+    if (dashEl) dashEl.innerHTML = renderDashboardContent();
+  }
+
+  async function saveStockAddItem() {
+    const catEl  = document.getElementById('stock-add-cat');
+    const subEl  = document.getElementById('stock-add-sub');
+    const skuEl  = document.getElementById('stock-add-sku');
+    const nameEl = document.getElementById('stock-add-name');
+    const lowEl  = document.getElementById('stock-add-low');
+    const errEl  = document.getElementById('stock-add-error');
+    const name = nameEl ? nameEl.value.trim() : '';
+    if (!name) { if (errEl) errEl.textContent = 'Product name is required'; return; }
+    const row = {
+      category:      catEl ? catEl.value : 'wall_floor',
+      sub_category:  subEl && subEl.value.trim() ? subEl.value.trim() : null,
+      sku:           skuEl && skuEl.value.trim() ? skuEl.value.trim() : null,
+      name,
+      low_stock_qty: lowEl && lowEl.value !== '' ? Number(lowEl.value) : null,
+    };
+    const { error } = await sb.from('stock_items').insert(row);
+    if (error) { if (errEl) errEl.textContent = 'Save failed — check connection'; return; }
+    state.dash.addItemOpen = false;
+    toast('Item added');
+    await loadDashboard();
   }
 
   function renderDashboardContent() {
