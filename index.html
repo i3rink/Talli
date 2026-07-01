@@ -503,7 +503,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span id="header-sub">v2.3.15</span>
+      <span id="header-sub">v2.3.16</span>
     </div>
   </div>
 
@@ -651,6 +651,7 @@
     else if (v === 'c3-check') root.innerHTML = renderC3Check();
     else if (v === 'c3-done')  root.innerHTML = renderC3Done();
     else if (v === 'c4-overview') root.innerHTML = renderC4Overview();
+    else if (v === 'c4-misc')     root.innerHTML = renderC4Misc();
     else if (v === 'c4-subcats') root.innerHTML = renderC4SubCats();
     else if (v === 'c4-category') {
       root.innerHTML = renderC4Category();
@@ -1370,6 +1371,7 @@
     { key: 'brassware',   name: 'Brassware',     icon: '&#9672;' },
     { key: 'furniture',   name: 'Furniture',     icon: '&#9636;' },
     { key: 'sundries',    name: 'Sundries',      icon: '&#9637;' },
+    { key: 'misc',        name: 'Miscellaneous', icon: '&#9749;', special: 'misc' },
   ];
 
   async function loadC4Counts() {
@@ -1385,6 +1387,15 @@
   function renderC4Overview() {
     const counts = state.c4.counts || {};
     const catCards = C4_CATS.map(c => {
+      if (c.special === 'misc') {
+        const n = state.c4.miscCount || 0;
+        return `
+      <div class="c4-cat" data-action="c4-open-misc" style="cursor:pointer;background:linear-gradient(135deg,#f5f3ff,#ede9fe);">
+        <div class="c4-cat-icon">${c.icon}</div>
+        <div class="c4-cat-name">${esc(c.name)}</div>
+        <div class="c4-cat-count">${n} logged</div>
+      </div>`;
+      }
       const n = counts[c.key] || 0;
       return `
       <div class="c4-cat" data-action="c4-open-cat" data-cat="${c.key}" style="cursor:pointer;${n === 0 ? 'opacity:.5' : ''}">
@@ -1411,6 +1422,82 @@
     state.c4.loading = false;
     if (error) { toast('Could not load items'); state.c4.items = []; return; }
     state.c4.items = data || [];
+  }
+
+  /* ── misc stock ── */
+  async function loadMiscItems() {
+    const { data, error } = await sb.from('misc_stock').select('*').order('created_at', { ascending: false });
+    if (error) { toast('Could not load misc items'); return; }
+    state.c4.miscItems = data || [];
+    state.c4.miscCount = (data || []).length;
+  }
+
+  function renderC4Misc() {
+    const items = state.c4.miscItems || [];
+    const rows = items.map(i => `
+      <div class="c4-item-row">
+        <div class="c4-item-info" style="flex:1;">
+          <div class="c4-item-name">${esc(i.description)}</div>
+          <div style="display:flex;gap:8px;align-items:center;margin-top:2px;">
+            <span class="item-sku">Qty: ${i.qty ?? '—'}</span>
+            ${i.warehouse ? `<span class="item-sku" style="background:#ede9fe;color:#7c3aed;">${esc(i.warehouse)}</span>` : ''}
+          </div>
+        </div>
+        <button class="btn btn-ghost" data-action="c4-misc-delete" data-id="${esc(i.id)}" style="font-size:.75rem;padding:4px 8px;flex-shrink:0;">Remove</button>
+      </div>`).join('');
+
+    const locs = ['7','9','11','SHO','19'];
+    const form = `
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+        <div class="card-title" style="font-size:.9rem;margin-bottom:10px;">Log an item</div>
+        <textarea class="text-input" id="misc-desc" placeholder="Describe the item&hellip;" rows="2" style="width:100%;margin-bottom:8px;resize:none;"></textarea>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
+          <label style="font-size:.78rem;color:var(--text-muted);white-space:nowrap;">Qty</label>
+          <input class="text-input" id="misc-qty" type="tel" inputmode="numeric" placeholder="0" style="width:70px;" />
+        </div>
+        <div class="c4-loc-pills" style="margin-bottom:12px;">
+          <span class="c4-loc-label">Location</span>
+          ${locs.map(l => `<button class="c4-loc-pill" data-action="c4-misc-loc" data-loc="${l}">${l}</button>`).join('')}
+        </div>
+        <button class="btn btn-primary" data-action="c4-misc-save" style="width:100%;">Log item</button>
+      </div>`;
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-overview">&#8592; Categories</button></div>
+      <div class="card">
+        <div class="card-title">Miscellaneous Stock</div>
+        <p class="text-muted text-sm" style="margin-bottom:12px;">Log any items that aren't in the main stock lists. Admin will review and add them properly.</p>
+        ${items.length ? rows : '<p class="text-muted text-sm">Nothing logged yet.</p>'}
+        ${form}
+      </div>`;
+  }
+
+  async function saveMiscItem() {
+    const desc = (document.getElementById('misc-desc') || {}).value || '';
+    const qty  = (document.getElementById('misc-qty')  || {}).value || '';
+    const loc  = state.c4.miscLoc || null;
+    if (!desc.trim()) { toast('Please add a description'); return; }
+    const row = {
+      description:  desc.trim(),
+      qty:          qty === '' ? null : Number(qty),
+      warehouse:    loc,
+      submitted_by: state.role || 'warehouse',
+      reviewed:     false,
+    };
+    const { error } = await sb.from('misc_stock').insert(row);
+    if (error) { toast('Save failed — check connection'); return; }
+    state.c4.miscLoc = null;
+    await loadMiscItems();
+    render();
+    toast('Item logged');
+  }
+
+  async function deleteMiscItem(id) {
+    if (!confirm('Remove this item?')) return;
+    const { error } = await sb.from('misc_stock').delete().eq('id', id);
+    if (error) { toast('Delete failed'); return; }
+    await loadMiscItems();
+    render();
   }
 
   function renderC4SubCats() {
@@ -1647,7 +1734,7 @@
       if (mod === 'verifier')   { state.view = 'upload'; }
       if (mod === 'completion') { state.view = 'c2-home'; }
       if (mod === 'delivery')   { state.view = 'c3-home'; }
-      if (mod === 'stock')      { state.view = 'c4-overview'; loadC4Counts().then(render); }
+      if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems()]).then(render); }
       render(); return;
     }
     /* ── upload-cancel: clears staging/append state, returns home without wiping M2/M3 ── */
@@ -1711,6 +1798,29 @@
     }
     if (action === 'c4-loc') {
       saveC4Location(btn.dataset.id, btn.dataset.loc);
+      return;
+    }
+    if (action === 'c4-open-misc') {
+      state.view = 'c4-misc';
+      state.c4.miscLoc = null;
+      render();
+      loadMiscItems().then(render);
+      return;
+    }
+    if (action === 'c4-misc-loc') {
+      const picked = btn.dataset.loc;
+      state.c4.miscLoc = state.c4.miscLoc === picked ? null : picked;
+      document.querySelectorAll('[data-action="c4-misc-loc"]').forEach(b => {
+        b.classList.toggle('active', b.dataset.loc === state.c4.miscLoc);
+      });
+      return;
+    }
+    if (action === 'c4-misc-save') {
+      saveMiscItem();
+      return;
+    }
+    if (action === 'c4-misc-delete') {
+      deleteMiscItem(btn.dataset.id);
       return;
     }
     if (action === 'c4-bo-open') {
