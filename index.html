@@ -322,6 +322,10 @@
     .stock-add-form { display: flex; flex-direction: column; gap: 8px; padding: 12px; background: var(--bg); border-radius: 8px; margin-top: 4px; }
     .stock-add-form .text-input { width: 100%; }
     .c4-item-row-oos { opacity: .65; }
+    .c4-loc-pills { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 4px; }
+    .c4-loc-pill { padding: 2px 8px; border-radius: 12px; border: 1px solid var(--border); background: var(--bg); font-size: .72rem; font-family: var(--font-body); cursor: pointer; color: var(--text-muted); line-height: 1.6; }
+    .c4-loc-pill.active { background: #7c3aed; border-color: #7c3aed; color: #fff; font-weight: 600; }
+    .c4-loc-pill:active { opacity: .75; }
     .c4-oos-tag { font-size: .72rem; color: var(--red); font-weight: 700; margin-top: 3px; display: block; }
     .stock-oos-mark-form { width: 100%; margin-top: 6px; padding: 10px; background: #fef2f2; border-radius: 8px; }
     .stock-oos-mark-form .text-input { width: 100%; padding: 6px 8px; font-size: .82rem; }
@@ -498,7 +502,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span id="header-sub">v2.3.13</span>
+      <span id="header-sub">v2.3.14</span>
     </div>
   </div>
 
@@ -1493,6 +1497,9 @@
             <div class="c4-item-name">${esc(i.name)}</div>
             ${i.sku ? `<span class="item-sku">${esc(i.sku)}</span>` : ''}
             ${i.out_of_stock ? `<span class="c4-oos-tag">Out of stock${i.oos_expected_label ? ' &mdash; ' + esc(i.oos_expected_label) : ''}</span>` : ''}
+            <div class="c4-loc-pills">
+              ${['7','9','11','SHO','19'].map(loc => `<button class="c4-loc-pill${(i.warehouse||'') === loc ? ' active' : ''}" data-action="c4-loc" data-id="${esc(i.id)}" data-loc="${loc}">${loc}</button>`).join('')}
+            </div>
             ${boTag}
             ${boForm}
           </div>
@@ -1547,6 +1554,17 @@
     if (item) item.current_qty = val;
     /* count history — append only, never blocks the main save if it fails */
     sb.from('stock_count_log').insert({ item_id: id, qty: val, counted_by: countedBy, counted_at: countedAt });
+  }
+
+  async function saveC4Location(id, loc) {
+    const item = (state.c4.items || []).find(i => i.id === id);
+    if (!item) return;
+    /* toggle off if already selected */
+    const newVal = item.warehouse === loc ? null : loc;
+    const { error } = await sb.from('stock_items').update({ warehouse: newVal }).eq('id', id);
+    if (error) { toast('Save failed — check connection'); return; }
+    item.warehouse = newVal;
+    render();
   }
 
   function stepC4Qty(id, dir) {
@@ -1687,6 +1705,10 @@
     }
     if (action === 'c4-step') {
       stepC4Qty(btn.dataset.id, Number(btn.dataset.dir));
+      return;
+    }
+    if (action === 'c4-loc') {
+      saveC4Location(btn.dataset.id, btn.dataset.loc);
       return;
     }
     if (action === 'c4-bo-open') {
