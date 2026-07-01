@@ -503,7 +503,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span id="header-sub">v2.3.16</span>
+      <span id="header-sub">v2.3.17</span>
     </div>
   </div>
 
@@ -652,6 +652,7 @@
     else if (v === 'c3-done')  root.innerHTML = renderC3Done();
     else if (v === 'c4-overview') root.innerHTML = renderC4Overview();
     else if (v === 'c4-misc')     root.innerHTML = renderC4Misc();
+    else if (v === 'c4-showroom')  root.innerHTML = renderC4Showroom();
     else if (v === 'c4-subcats') root.innerHTML = renderC4SubCats();
     else if (v === 'c4-category') {
       root.innerHTML = renderC4Category();
@@ -1372,6 +1373,7 @@
     { key: 'furniture',   name: 'Furniture',     icon: '&#9636;' },
     { key: 'sundries',    name: 'Sundries',      icon: '&#9637;' },
     { key: 'misc',        name: 'Miscellaneous', icon: '&#9749;', special: 'misc' },
+    { key: 'showroom',    name: 'Showroom Bays',  icon: '&#9734;', special: 'showroom' },
   ];
 
   async function loadC4Counts() {
@@ -1394,6 +1396,15 @@
         <div class="c4-cat-icon">${c.icon}</div>
         <div class="c4-cat-name">${esc(c.name)}</div>
         <div class="c4-cat-count">${n} logged</div>
+      </div>`;
+      }
+      if (c.special === 'showroom') {
+        const n = state.c4.showroomCount || 0;
+        return `
+      <div class="c4-cat" data-action="c4-open-showroom" style="cursor:pointer;background:linear-gradient(135deg,#fefce8,#fef9c3);">
+        <div class="c4-cat-icon">${c.icon}</div>
+        <div class="c4-cat-name">${esc(c.name)}</div>
+        <div class="c4-cat-count">${n} bay${n === 1 ? '' : 's'} recorded</div>
       </div>`;
       }
       const n = counts[c.key] || 0;
@@ -1498,6 +1509,91 @@
     if (error) { toast('Delete failed'); return; }
     await loadMiscItems();
     render();
+  }
+
+  /* ── showroom bays ── */
+  const SHOWROOM_FIELDS = ['Bath or Shower', 'Screen', 'WC', 'Basin', 'Furniture', 'Brassware', 'Wall Panels', 'Flooring'];
+
+  async function loadShowroomBays() {
+    const { data, error } = await sb.from('showroom_bays').select('*').order('bay_number', { ascending: true });
+    if (error) { toast('Could not load showroom bays'); return; }
+    state.c4.showroomBays = data || [];
+    state.c4.showroomCount = (data || []).length;
+  }
+
+  function renderC4Showroom() {
+    const bays = state.c4.showroomBays || [];
+    const editing = state.c4.showroomEditing; // bay_number being edited, or null for new
+
+    const bayCards = bays.map(b => {
+      const fields = SHOWROOM_FIELDS.map(f => {
+        const key = f.toLowerCase().replace(/ /g, '_').replace(/\//g, '_');
+        const val = b[key];
+        return val ? `<div style="font-size:.78rem;margin-top:3px;"><span style="color:var(--text-muted);">${esc(f)}:</span> ${esc(val)}</div>` : '';
+      }).join('');
+      return `
+      <div class="c4-item-row" style="align-items:flex-start;flex-direction:column;gap:6px;">
+        <div style="display:flex;justify-content:space-between;width:100%;align-items:center;">
+          <div class="c4-item-name">Bay ${esc(String(b.bay_number))}</div>
+          <button class="btn btn-ghost" data-action="c4-showroom-edit" data-bay="${esc(String(b.bay_number))}" style="font-size:.75rem;padding:4px 8px;">Edit</button>
+        </div>
+        ${fields || '<div style="font-size:.78rem;color:var(--text-muted);">No details recorded</div>'}
+      </div>`;
+    }).join('');
+
+    const isEditing = editing !== null && editing !== undefined;
+    const editBay = isEditing ? bays.find(b => String(b.bay_number) === String(editing)) : null;
+
+    const formFields = SHOWROOM_FIELDS.map(f => {
+      const key = f.toLowerCase().replace(/ /g, '_').replace(/\//g, '_');
+      const val = editBay ? (editBay[key] || '') : '';
+      return `
+        <div style="margin-bottom:8px;">
+          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:3px;">${esc(f)}</label>
+          <input class="text-input" type="text" id="sbay-${key}" placeholder="e.g. Kaldewei Puro 170x70" value="${esc(val)}" style="width:100%;" />
+        </div>`;
+    }).join('');
+
+    const form = `
+      <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
+        <div class="card-title" style="font-size:.9rem;margin-bottom:10px;">${isEditing ? 'Edit Bay ' + esc(String(editing)) : 'Record a bay'}</div>
+        <div style="margin-bottom:8px;">
+          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:3px;">Bay number</label>
+          <input class="text-input" id="sbay-number" type="tel" inputmode="numeric" placeholder="e.g. 6" value="${isEditing ? esc(String(editing)) : ''}" style="width:90px;" ${isEditing ? 'readonly' : ''} />
+        </div>
+        ${formFields}
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <button class="btn btn-primary" data-action="c4-showroom-save" style="flex:1;">Save bay</button>
+          ${isEditing ? `<button class="btn btn-ghost" data-action="c4-showroom-cancel" style="flex:1;">Cancel</button>` : ''}
+        </div>
+      </div>`;
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-overview">&#8592; Categories</button></div>
+      <div class="card">
+        <div class="card-title">Showroom Bays</div>
+        <p class="text-muted text-sm" style="margin-bottom:12px;">Record what's on display in each bay. Submitting a bay number overwrites the previous record for that bay.</p>
+        ${bays.length ? bayCards : '<p class="text-muted text-sm">No bays recorded yet.</p>'}
+        ${form}
+      </div>`;
+  }
+
+  async function saveShowroomBay() {
+    const bayNum = parseInt((document.getElementById('sbay-number') || {}).value || '', 10);
+    if (!bayNum || isNaN(bayNum)) { toast('Enter a bay number'); return; }
+    const row = { bay_number: bayNum };
+    SHOWROOM_FIELDS.forEach(f => {
+      const key = f.toLowerCase().replace(/ /g, '_').replace(/\//g, '_');
+      const el = document.getElementById('sbay-' + key);
+      row[key] = el ? (el.value.trim() || null) : null;
+    });
+    /* upsert on bay_number — overwrites existing record for that bay */
+    const { error } = await sb.from('showroom_bays').upsert(row, { onConflict: 'bay_number' });
+    if (error) { toast('Save failed — check connection'); return; }
+    state.c4.showroomEditing = null;
+    await loadShowroomBays();
+    render();
+    toast('Bay saved');
   }
 
   function renderC4SubCats() {
@@ -1734,7 +1830,7 @@
       if (mod === 'verifier')   { state.view = 'upload'; }
       if (mod === 'completion') { state.view = 'c2-home'; }
       if (mod === 'delivery')   { state.view = 'c3-home'; }
-      if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems()]).then(render); }
+      if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays()]).then(render); }
       render(); return;
     }
     /* ── upload-cancel: clears staging/append state, returns home without wiping M2/M3 ── */
@@ -1798,6 +1894,27 @@
     }
     if (action === 'c4-loc') {
       saveC4Location(btn.dataset.id, btn.dataset.loc);
+      return;
+    }
+    if (action === 'c4-open-showroom') {
+      state.view = 'c4-showroom';
+      state.c4.showroomEditing = null;
+      render();
+      loadShowroomBays().then(render);
+      return;
+    }
+    if (action === 'c4-showroom-edit') {
+      state.c4.showroomEditing = btn.dataset.bay;
+      render();
+      return;
+    }
+    if (action === 'c4-showroom-cancel') {
+      state.c4.showroomEditing = null;
+      render();
+      return;
+    }
+    if (action === 'c4-showroom-save') {
+      saveShowroomBay();
       return;
     }
     if (action === 'c4-open-misc') {
