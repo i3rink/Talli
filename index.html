@@ -370,6 +370,11 @@
       border-radius: 20px; background: #fee2e2; color: var(--red);
     }
     .dash-count.ok { background: #d1fae5; color: var(--green); }
+    .dash-section-head { cursor: pointer; user-select: none; }
+    .dash-module-body { display: none; }
+    .dash-module-body.open { display: block; }
+    .dash-module-chevron { font-size: .75rem; color: var(--muted); transition: transform .2s; margin-left: 4px; }
+    .dash-module-chevron.open { transform: rotate(90deg); }
 
     /* ── Dashboard session expand ── */
     .dash-session {
@@ -484,7 +489,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span id="header-sub">v2.3.12</span>
+      <span id="header-sub">v2.3.13</span>
     </div>
   </div>
 
@@ -579,6 +584,7 @@
     dashUnlocked: false,
     /* expanded session keys in dashboard M1 */
     dashExpanded: {},
+    dashModuleExpanded: {},
   };
 
   let snakeAnimId = null;
@@ -1401,7 +1407,7 @@
     const items = state.c4.items || [];
     const q = (state.c4.search || '').toLowerCase().trim();
     const filtered = q
-      ? items.filter(i => (i.name || '').toLowerCase().includes(q) || (i.sku || '').toLowerCase().includes(q))
+      ? items.filter(i => (i.name || '').toLowerCase().includes(q) || (i.sku || '').toLowerCase().includes(q) || (i.vendor || '').toLowerCase().includes(q))
       : items;
 
     /* group by sub_category */
@@ -1679,6 +1685,17 @@
     if (action === 'copy-dash-m2') { copyDashM2(); return; }
     if (action === 'copy-dash-m3') { copyDashM3(); return; }
     if (action === 'dash-unlock') { tryDashUnlock(); return; }
+
+    /* ── dashboard module-level collapse ── */
+    if (action === 'dash-module-toggle') {
+      const mod = btn.closest('[data-module]')?.dataset.module || btn.dataset.module;
+      state.dashModuleExpanded[mod] = !state.dashModuleExpanded[mod];
+      const body    = document.querySelector(`.dash-module-body[data-module="${mod}"]`);
+      const chevron = document.querySelector(`.dash-module-chevron[data-module="${mod}"]`);
+      if (body)    body.classList.toggle('open', state.dashModuleExpanded[mod]);
+      if (chevron) chevron.classList.toggle('open', state.dashModuleExpanded[mod]);
+      return;
+    }
 
     /* ── dashboard session expand/collapse ── */
     if (action === 'dash-expand') {
@@ -2723,11 +2740,13 @@
       </div>` : '';
 
     return `<div class="dash-section">
-      <div class="dash-section-head">
+      <div class="dash-section-head" data-action="dash-module-toggle" data-module="m4">
         <div class="dash-stripe" style="background:#7c3aed;"></div>
         <div class="dash-section-title">Stock Checker</div>
         <span class="dash-count" style="background:#ede9fe;color:#7c3aed;">${stockCounted} of ${stockTotal} counted</span>
+        <span class="dash-module-chevron${state.dashModuleExpanded.m4 ? ' open' : ''}" data-module="m4">&#9658;</span>
       </div>
+      <div class="dash-module-body${state.dashModuleExpanded.m4 ? ' open' : ''}" data-module="m4">
       ${lowRows ? `<div class="dash-item" style="font-weight:700;border-bottom:none;padding-bottom:0;">Low stock</div>${lowRows}` : `<div class="dash-item text-muted text-sm">No items below their low stock threshold.</div>`}
       ${boRows ? `<div class="dash-item" style="font-weight:700;border-bottom:none;padding-bottom:0;margin-top:6px;">Back order</div>${boRows}` : ''}
       <div class="dash-footer" style="flex-wrap:wrap;gap:8px;">
@@ -2735,6 +2754,7 @@
         ${state.dash.oosOpen ? '' : `<button class="btn btn-ghost" data-action="stock-oos-open" style="font-size:.8rem;padding:6px 14px;">Mark item out of stock</button>`}
       </div>
       ${oosOpen}
+      </div>
     </div>`;
   }
 
@@ -2854,14 +2874,17 @@
       }).join('');
 
       m1Html = `<div class="dash-section">
-        <div class="dash-section-head">
+        <div class="dash-section-head" data-action="dash-module-toggle" data-module="m1">
           <div class="dash-stripe" style="background:#0075ab;"></div>
           <div class="dash-section-title">01 &nbsp;Purchasing shortfalls</div>
           <span class="dash-count">${m1Count} item${m1Count !== 1 ? 's' : ''}</span>
+          <span class="dash-module-chevron${state.dashModuleExpanded.m1 ? ' open' : ''}" data-module="m1">&#9658;</span>
         </div>
+        <div class="dash-module-body${state.dashModuleExpanded.m1 ? ' open' : ''}" data-module="m1">
         ${sessionBlocks}
         <div class="dash-footer">
           <button class="btn btn-ghost" data-action="copy-dash-m1" style="font-size:.8rem;padding:6px 14px;">&#128722; Send purchasing list</button>
+        </div>
         </div>
       </div>`;
     }
@@ -2891,14 +2914,17 @@
       }).join('');
 
       m2Html = `<div class="dash-section">
-        <div class="dash-section-head">
+        <div class="dash-section-head" data-action="dash-module-toggle" data-module="m2">
           <div class="dash-stripe" style="background:#059669;"></div>
           <div class="dash-section-title">02 &nbsp;Pick shortfalls</div>
           <span class="dash-count">${m2Count} item${m2Count !== 1 ? 's' : ''}</span>
+          <span class="dash-module-chevron${state.dashModuleExpanded.m2 ? ' open' : ''}" data-module="m2">&#9658;</span>
         </div>
+        <div class="dash-module-body${state.dashModuleExpanded.m2 ? ' open' : ''}" data-module="m2">
         ${jobBlocks}
         <div class="dash-footer">
           <button class="btn btn-ghost" data-action="copy-dash-m2" style="font-size:.8rem;padding:6px 14px;">&#128722; Send pick shortfalls</button>
+        </div>
         </div>
       </div>`;
     }
@@ -2929,14 +2955,17 @@
       }).join('');
 
       m3Html = `<div class="dash-section">
-        <div class="dash-section-head">
+        <div class="dash-section-head" data-action="dash-module-toggle" data-module="m3">
           <div class="dash-stripe" style="background:#ea580c;"></div>
           <div class="dash-section-title">03 &nbsp;Remedial deliveries needed</div>
           <span class="dash-count">${m3Count} item${m3Count !== 1 ? 's' : ''}</span>
+          <span class="dash-module-chevron${state.dashModuleExpanded.m3 ? ' open' : ''}" data-module="m3">&#9658;</span>
         </div>
+        <div class="dash-module-body${state.dashModuleExpanded.m3 ? ' open' : ''}" data-module="m3">
         ${jobBlocks}
         <div class="dash-footer">
           <button class="btn btn-ghost" data-action="copy-dash-m3" style="font-size:.8rem;padding:6px 14px;">&#128722; Send remedial list</button>
+        </div>
         </div>
       </div>`;
     }
