@@ -503,7 +503,7 @@
     </div>
     <div class="header-divider"></div>
     <div class="header-text">
-      <span id="header-sub">v2.3.17</span>
+      <span id="header-sub">v2.3.18</span>
     </div>
   </div>
 
@@ -705,7 +705,6 @@
           <span class="lp-glyph" style="color:#ea580c;">${ic.truck}</span>
         </button>
         <button class="lp-card c-purple" data-action="open-module" data-mod="stock">
-          <span class="lp-badge">Coming soon</span>
           <span class="lp-num">04</span>
           <span class="lp-name">Stock Checker</span>
           <span class="lp-desc">Physical counts by category, variance review, audit trail.</span>
@@ -1374,6 +1373,7 @@
     { key: 'sundries',    name: 'Sundries',      icon: '&#9637;' },
     { key: 'misc',        name: 'Miscellaneous', icon: '&#9749;', special: 'misc' },
     { key: 'showroom',    name: 'Showroom Bays',  icon: '&#9734;', special: 'showroom' },
+    { key: 'goods_in',    name: 'Goods In',       icon: '&#9744;', special: 'goods_in' },
   ];
 
   async function loadC4Counts() {
@@ -1405,6 +1405,14 @@
         <div class="c4-cat-icon">${c.icon}</div>
         <div class="c4-cat-name">${esc(c.name)}</div>
         <div class="c4-cat-count">${n} bay${n === 1 ? '' : 's'} recorded</div>
+      </div>`;
+      }
+      if (c.special === 'goods_in') {
+        return `
+      <div class="c4-cat" style="cursor:default;opacity:.6;position:relative;">
+        <div class="c4-cat-icon">${c.icon}</div>
+        <div class="c4-cat-name">${esc(c.name)}</div>
+        <div class="c4-cat-count" style="background:#e0f2fe;color:#0369a1;">Coming soon</div>
       </div>`;
       }
       const n = counts[c.key] || 0;
