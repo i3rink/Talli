@@ -375,6 +375,15 @@
     .dash-module-body.open { display: block; }
     .dash-module-chevron { font-size: .75rem; color: var(--muted); transition: transform .2s; margin-left: 4px; }
     .dash-module-chevron.open { transform: rotate(90deg); }
+    .c4-subcat-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 4px; border-bottom: 1px solid var(--border);
+      cursor: pointer;
+    }
+    .c4-subcat-row:last-child { border-bottom: none; }
+    .c4-subcat-row:active { background: var(--bg); }
+    .c4-subcat-name { flex: 1; font-weight: 600; font-size: .88rem; color: var(--text); }
+    .c4-subcat-meta { display: flex; gap: 6px; flex-wrap: wrap; }
 
     /* ── Dashboard session expand ── */
     .dash-session {
@@ -578,7 +587,7 @@
     /* module 3 — driver delivery */
     c3: { jobRef: '', items: [], delivered: {}, driverName: '', loading: false, session: null },
     /* module 4 — stock checker */
-    c4: { screen: 'overview' },
+    c4: { screen: 'overview', subCat: null },
     /* home dashboard */
     dash: { loading: true, m1: [], m2: [], m3: [] },
     dashUnlocked: false,
@@ -637,6 +646,7 @@
     else if (v === 'c3-check') root.innerHTML = renderC3Check();
     else if (v === 'c3-done')  root.innerHTML = renderC3Done();
     else if (v === 'c4-overview') root.innerHTML = renderC4Overview();
+    else if (v === 'c4-subcats') root.innerHTML = renderC4SubCats();
     else if (v === 'c4-category') {
       root.innerHTML = renderC4Category();
       const s = document.querySelector('[data-action="c4-search"]');
@@ -1398,17 +1408,61 @@
     state.c4.items = data || [];
   }
 
-  function renderC4Category() {
+  function renderC4SubCats() {
     const cat = C4_CATS.find(c => c.key === state.c4.cat);
     if (state.c4.loading) {
       return `<div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-overview">&#8592; Categories</button></div>
-        <div class="card"><p class="text-muted">Loading items&hellip;</p></div>`;
+        <div class="card"><p class="text-muted">Loading&hellip;</p></div>`;
     }
     const items = state.c4.items || [];
+
+    /* group by sub_category, count items and counted items per group */
+    const groups = {};
+    items.forEach(i => {
+      const g = i.sub_category || 'Other';
+      if (!groups[g]) groups[g] = { total: 0, counted: 0 };
+      groups[g].total++;
+      if (i.current_qty !== null && i.current_qty !== undefined) groups[g].counted++;
+    });
+    const groupKeys = Object.keys(groups).sort();
+
+    const rows = groupKeys.map(g => {
+      const { total, counted } = groups[g];
+      return `
+        <div class="c4-subcat-row" data-action="c4-open-subcat" data-subcat="${esc(g)}">
+          <div class="c4-subcat-name">${esc(g)}</div>
+          <div class="c4-subcat-meta">
+            <span class="c4-cat-count">${total} item${total !== 1 ? 's' : ''}</span>
+            ${counted > 0 ? `<span class="c4-cat-count" style="background:#d1fae5;color:#059669;">${counted} counted</span>` : ''}
+          </div>
+          <span style="color:var(--muted);font-size:.9rem;">&#9658;</span>
+        </div>`;
+    }).join('');
+
+    const totalCounted = items.filter(i => i.current_qty !== null && i.current_qty !== undefined).length;
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-overview">&#8592; Categories</button></div>
+      <div class="card">
+        <div class="card-title">${esc(cat ? cat.name : '')}</div>
+        <p class="text-muted text-sm" style="margin-bottom:12px;">${totalCounted} of ${items.length} counted</p>
+        ${rows || '<div class="text-muted text-sm">No items found.</div>'}
+      </div>`;
+  }
+
+  function renderC4Category() {
+    const cat = C4_CATS.find(c => c.key === state.c4.cat);
+    if (state.c4.loading) {
+      return `<div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-subcats">&#8592; ${esc(state.c4.subCat || 'Back')}</button></div>
+        <div class="card"><p class="text-muted">Loading items&hellip;</p></div>`;
+    }
+    const allItems = state.c4.items || [];
+    const subCat = state.c4.subCat || null;
+    const inSubCat = subCat ? allItems.filter(i => (i.sub_category || 'Other') === subCat) : allItems;
     const q = (state.c4.search || '').toLowerCase().trim();
     const filtered = q
-      ? items.filter(i => (i.name || '').toLowerCase().includes(q) || (i.sku || '').toLowerCase().includes(q) || (i.vendor || '').toLowerCase().includes(q))
-      : items;
+      ? inSubCat.filter(i => (i.name || '').toLowerCase().includes(q) || (i.sku || '').toLowerCase().includes(q) || (i.vendor || '').toLowerCase().includes(q))
+      : inSubCat;
 
     /* group by sub_category */
     const groups = {};
@@ -1418,7 +1472,7 @@
     });
     const groupKeys = Object.keys(groups).sort();
 
-    const countedTotal = items.filter(i => i.current_qty !== null && i.current_qty !== undefined).length;
+    const countedTotal = inSubCat.filter(i => i.current_qty !== null && i.current_qty !== undefined).length;
 
     const sections = groupKeys.map(g => {
       const rows = groups[g].map(i => {
@@ -1458,10 +1512,10 @@
     }).join('') || `<div class="empty-state"><div class="icon">&#128269;</div><p>No items match</p></div>`;
 
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-overview">&#8592; Categories</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-subcats">&#8592; ${esc(state.c4.subCat || (cat ? cat.name : 'Back'))}</button></div>
       <div class="card">
-        <div class="card-title">${esc(cat ? cat.name : '')}</div>
-        <p class="text-muted text-sm" style="margin-bottom:8px;">${countedTotal} of ${items.length} counted</p>
+        <div class="card-title">${esc(state.c4.subCat || (cat ? cat.name : ''))}</div>
+        <p class="text-muted text-sm" style="margin-bottom:8px;">${countedTotal} of ${inSubCat.length} counted</p>
         <input class="text-input" type="text" placeholder="Search by name or SKU&hellip;"
           value="${esc(state.c4.search || '')}" data-action="c4-search" style="margin-bottom:14px;width:100%;" />
         ${sections}
@@ -1651,14 +1705,30 @@
       state.c4.cat = btn.dataset.cat;
       state.c4.items = [];
       state.c4.search = '';
-      state.view = 'c4-category';
+      state.c4.subCat = null;
+      state.view = 'c4-subcats';
       render();
       await loadC4Items(btn.dataset.cat);
       render();
       return;
     }
+    if (action === 'c4-open-subcat') {
+      state.c4.subCat = btn.dataset.subcat;
+      state.c4.search = '';
+      state.view = 'c4-category';
+      render();
+      return;
+    }
+    if (action === 'c4-back-subcats') {
+      state.c4.subCat = null;
+      state.c4.search = '';
+      state.view = 'c4-subcats';
+      render();
+      return;
+    }
     if (action === 'c4-back-overview') {
       state.c4.counts = null; /* refresh counts */
+      state.c4.subCat = null;
       state.view = 'c4-overview';
       render();
       await loadC4Counts();
