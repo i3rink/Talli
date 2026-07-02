@@ -573,7 +573,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.8.4';
+  const VERSION = 'v2.8.5';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1455,18 +1455,18 @@
       }
       if (c.special === 'goods_in') {
         return `
-      <div class="c4-cat" style="cursor:default;opacity:.6;position:relative;">
-        <div class="c4-cat-icon">${c.icon}</div>
-        <div class="c4-cat-name">${esc(c.name)}</div>
-        <div class="c4-cat-count" style="background:#e0f2fe;color:#0369a1;">Coming soon</div>
+      <div class="c4-cat" style="cursor:default;opacity:.75;position:relative;background:linear-gradient(180deg,#059669 0%,#ffffff 100%);">
+        <div class="c4-cat-icon" style="opacity:1;color:#fff;">${c.icon}</div>
+        <div class="c4-cat-name" style="color:#064e3b;">${esc(c.name)}</div>
+        <div class="c4-cat-count" style="background:rgba(5,150,105,.15);color:#064e3b;">Coming soon</div>
       </div>`;
       }
       const n = counts[c.key] || 0;
       return `
-      <div class="c4-cat" data-action="c4-open-cat" data-cat="${c.key}" style="cursor:pointer;${n === 0 ? 'opacity:.5' : ''}">
-        <div class="c4-cat-icon">${c.icon}</div>
-        <div class="c4-cat-name">${esc(c.name)}</div>
-        <div class="c4-cat-count">${n} item${n === 1 ? '' : 's'}</div>
+      <div class="c4-cat" data-action="c4-open-cat" data-cat="${c.key}" style="cursor:pointer;background:linear-gradient(180deg,#0075ab 0%,#ffffff 100%);${n === 0 ? 'opacity:.45' : ''}">
+        <div class="c4-cat-icon" style="opacity:1;color:#fff;">${c.icon}</div>
+        <div class="c4-cat-name" style="color:#003d5c;">${esc(c.name)}</div>
+        <div class="c4-cat-count" style="background:rgba(0,117,171,.12);color:#003d5c;">${n} item${n === 1 ? '' : 's'}</div>
       </div>`;
     }).join('');
     return `
