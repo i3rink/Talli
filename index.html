@@ -573,7 +573,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.8.5';
+  const VERSION = 'v2.8.6';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1429,44 +1429,47 @@
       if (c.special === 'eol') {
         const n = (state.c4.eolItems || []).length;
         return `
-      <div class="c4-cat" data-action="c4-open-eol" style="cursor:pointer;background:linear-gradient(135deg,#fff7ed,#fed7aa);">
-        <div class="c4-cat-icon">${c.icon}</div>
-        <div class="c4-cat-name">${esc(c.name)}</div>
-        <div class="c4-cat-count" style="background:#ffedd5;color:#c2410c;">${n} item${n === 1 ? '' : 's'}</div>
+      <div class="c4-cat" data-action="c4-open-eol" style="cursor:pointer;background:linear-gradient(180deg,#f97316 0%,#ffffff 100%);">
+        <div class="c4-cat-icon" style="opacity:1;color:#fff;">${c.icon}</div>
+        <div class="c4-cat-name" style="color:#7c2d00;">${esc(c.name)}</div>
+        <div class="c4-cat-count" style="background:rgba(249,115,22,.15);color:#7c2d00;">${n} item${n === 1 ? '' : 's'}</div>
       </div>`;
       }
       if (c.special === 'misc') {
         const n = state.c4.miscCount || 0;
         return `
-      <div class="c4-cat" data-action="c4-open-misc" style="cursor:pointer;background:linear-gradient(135deg,#f5f3ff,#ede9fe);">
-        <div class="c4-cat-icon">${c.icon}</div>
-        <div class="c4-cat-name">${esc(c.name)}</div>
-        <div class="c4-cat-count">${n} logged</div>
+      <div class="c4-cat" data-action="c4-open-misc" style="cursor:pointer;background:linear-gradient(180deg,#5b7b8a 0%,#ffffff 100%);">
+        <div class="c4-cat-icon" style="opacity:1;color:#fff;">${c.icon}</div>
+        <div class="c4-cat-name" style="color:#1e3a42;">${esc(c.name)}</div>
+        <div class="c4-cat-count" style="background:rgba(91,123,138,.15);color:#1e3a42;">${n} logged</div>
       </div>`;
       }
       if (c.special === 'showroom') {
         const n = state.c4.showroomCount || 0;
         return `
-      <div class="c4-cat" data-action="c4-open-showroom" style="cursor:pointer;background:linear-gradient(135deg,#fefce8,#fef9c3);">
-        <div class="c4-cat-icon">${c.icon}</div>
-        <div class="c4-cat-name">${esc(c.name)}</div>
-        <div class="c4-cat-count">${n} bay${n === 1 ? '' : 's'} recorded</div>
+      <div class="c4-cat" data-action="c4-open-showroom" style="cursor:pointer;background:linear-gradient(180deg,#4a9fa5 0%,#ffffff 100%);">
+        <div class="c4-cat-icon" style="opacity:1;color:#fff;">${c.icon}</div>
+        <div class="c4-cat-name" style="color:#164044;">${esc(c.name)}</div>
+        <div class="c4-cat-count" style="background:rgba(74,159,165,.15);color:#164044;">${n} bay${n === 1 ? '' : 's'} recorded</div>
       </div>`;
       }
       if (c.special === 'goods_in') {
         return `
-      <div class="c4-cat" style="cursor:default;opacity:.75;position:relative;background:linear-gradient(180deg,#059669 0%,#ffffff 100%);">
+      <div class="c4-cat" style="cursor:default;opacity:.75;position:relative;background:linear-gradient(180deg,#2a9d8f 0%,#ffffff 100%);">
         <div class="c4-cat-icon" style="opacity:1;color:#fff;">${c.icon}</div>
-        <div class="c4-cat-name" style="color:#064e3b;">${esc(c.name)}</div>
-        <div class="c4-cat-count" style="background:rgba(5,150,105,.15);color:#064e3b;">Coming soon</div>
+        <div class="c4-cat-name" style="color:#0d3d38;">${esc(c.name)}</div>
+        <div class="c4-cat-count" style="background:rgba(42,157,143,.15);color:#0d3d38;">Coming soon</div>
       </div>`;
       }
       const n = counts[c.key] || 0;
+      const tileTop = c.key === 'sundries' ? '#4f6d7a' : '#0075ab';
+      const tileDark = c.key === 'sundries' ? '#1a2d35' : '#003d5c';
+      const tileAlpha = c.key === 'sundries' ? 'rgba(79,109,122,.15)' : 'rgba(0,117,171,.12)';
       return `
-      <div class="c4-cat" data-action="c4-open-cat" data-cat="${c.key}" style="cursor:pointer;background:linear-gradient(180deg,#0075ab 0%,#ffffff 100%);${n === 0 ? 'opacity:.45' : ''}">
+      <div class="c4-cat" data-action="c4-open-cat" data-cat="${c.key}" style="cursor:pointer;background:linear-gradient(180deg,${tileTop} 0%,#ffffff 100%);${n === 0 ? 'opacity:.45' : ''}">
         <div class="c4-cat-icon" style="opacity:1;color:#fff;">${c.icon}</div>
-        <div class="c4-cat-name" style="color:#003d5c;">${esc(c.name)}</div>
-        <div class="c4-cat-count" style="background:rgba(0,117,171,.12);color:#003d5c;">${n} item${n === 1 ? '' : 's'}</div>
+        <div class="c4-cat-name" style="color:${tileDark};">${esc(c.name)}</div>
+        <div class="c4-cat-count" style="background:${tileAlpha};color:${tileDark};">${n} item${n === 1 ? '' : 's'}</div>
       </div>`;
     }).join('');
     return `
