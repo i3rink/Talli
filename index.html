@@ -573,7 +573,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.8.6';
+  const VERSION = 'v2.8.7';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1535,7 +1535,7 @@
         <div class="c4-item-row${isBackordered ? ' c4-item-row-bo' : ''}${i.out_of_stock ? ' c4-item-row-oos' : ''}">
           <div class="c4-item-info">
             <div class="c4-item-name">${esc(i.name)}</div>
-            ${i.sku ? `<span class="item-sku">${esc(i.sku)}</span>` : ''}
+            ${(i.sku || i.vendor_sku) ? `<span class="item-sku">${esc(i.sku || i.vendor_sku)}</span>` : ''}
             ${i.out_of_stock ? `<span class="c4-oos-tag">Out of stock${i.oos_expected_label ? ' &mdash; ' + esc(i.oos_expected_label) : ''}</span>` : ''}
             <div class="c4-loc-pills">
               <span class="c4-loc-label">Location</span>
@@ -1987,7 +1987,7 @@
     const inSubCat = subCat ? allItems.filter(i => (i.sub_category || 'Other') === subCat) : allItems;
     const q = (state.c4.search || '').toLowerCase().trim();
     const afterSearch = q
-      ? inSubCat.filter(i => (i.name || '').toLowerCase().includes(q) || (i.sku || '').toLowerCase().includes(q) || (i.vendor || '').toLowerCase().includes(q))
+      ? inSubCat.filter(i => (i.name || '').toLowerCase().includes(q) || (i.sku || i.vendor_sku || '').toLowerCase().includes(q) || (i.vendor || '').toLowerCase().includes(q))
       : inSubCat;
     const filtered = applyC4Filters(afterSearch);
 
@@ -2018,7 +2018,7 @@
         <div class="c4-item-row${isBackordered ? ' c4-item-row-bo' : ''}${i.out_of_stock ? ' c4-item-row-oos' : ''}">
           <div class="c4-item-info">
             <div class="c4-item-name">${esc(i.name)}</div>
-            ${i.sku ? `<span class="item-sku">${esc(i.sku)}</span>` : ''}
+            ${(i.sku || i.vendor_sku) ? `<span class="item-sku">${esc(i.sku || i.vendor_sku)}</span>` : ''}
             ${i.out_of_stock ? `<span class="c4-oos-tag">Out of stock${i.oos_expected_label ? ' &mdash; ' + esc(i.oos_expected_label) : ''}</span>` : ''}
             <div class="c4-loc-pills">
               <span class="c4-loc-label">Location</span>
