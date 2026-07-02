@@ -312,6 +312,25 @@
     .c4-cat-freq { font-size: .7rem; color: var(--muted); margin-top: 2px; }
     .c4-cat-count { font-size: .7rem; color: var(--muted); margin-top: 4px; background: var(--border); border-radius: 20px; display: inline-block; padding: 1px 8px; }
     .text-input { padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; font-size: .95rem; font-family: inherit; }
+    /* ── filter bar ── */
+    .c4-filter-bar { margin-bottom: 12px; }
+    .c4-filter-toggle { display: flex; align-items: center; gap: 8px; background: var(--faint); border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; cursor: pointer; font-size: .82rem; font-weight: 600; color: var(--text); width: 100%; text-align: left; }
+    .c4-filter-toggle:active { background: var(--teal-light); }
+    .c4-filter-badge { background: var(--teal); color: #fff; border-radius: 20px; font-size: .7rem; font-weight: 700; padding: 1px 7px; }
+    .c4-filter-panel { background: var(--faint); border: 1px solid var(--border); border-top: none; border-radius: 0 0 8px 8px; padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .c4-filter-row { display: flex; flex-direction: column; gap: 3px; }
+    .c4-filter-label { font-size: .72rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+    .c4-filter-select { width: 100%; padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: .82rem; background: var(--bg); color: var(--text); }
+    .c4-filter-clear { font-size: .75rem; color: var(--teal); background: none; border: none; padding: 2px 0; cursor: pointer; text-align: left; align-self: flex-start; }
+    /* ── wall panels section ── */
+    .c4-wall-section { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); }
+    .c4-wall-section-title { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: .9rem; color: var(--text); margin-bottom: 10px; }
+    .c4-wall-panel-card { border: 1px solid var(--border); border-radius: 10px; overflow: hidden; margin-bottom: 10px; }
+    .c4-wall-panel-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 12px; background: var(--bg); }
+    .c4-wall-panel-name { font-weight: 600; font-size: .85rem; }
+    .c4-wall-panel-body { padding: 10px 12px; border-top: 1px solid var(--border); display: flex; flex-direction: column; gap: 8px; }
+    .c4-wall-panel-img { width: 100%; max-height: 180px; object-fit: cover; border-radius: 6px; }
+    .c4-wall-panel-img-placeholder { width: 100%; height: 80px; border: 2px dashed var(--border); border-radius: 6px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: .78rem; cursor: pointer; }
     .c4-group { margin-bottom: 18px; }
     .c4-group-title { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: .8rem; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; margin-bottom: 8px; }
     .c4-item-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
@@ -547,7 +566,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.8.2';
+  const VERSION = 'v2.8.3';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1651,6 +1670,59 @@
     state.c4.showroomCount = (data || []).length;
   }
 
+  async function loadWallPanels() {
+    const { data, error } = await sb.from('showroom_wall_panels').select('*').order('position');
+    if (error) { /* table may not exist yet — soft fail */ state.c4.wallPanels = []; return; }
+    state.c4.wallPanels = data || [];
+  }
+
+  async function saveWallPanel(panelId) {
+    const nameEl = document.getElementById('wp-name-' + panelId);
+    const noteEl = document.getElementById('wp-note-' + panelId);
+    if (!nameEl) return;
+    const row = {
+      id: panelId,
+      name: nameEl.value.trim() || null,
+      note: noteEl ? noteEl.value.trim() || null : null,
+    };
+    const { error } = await sb.from('showroom_wall_panels').upsert(row, { onConflict: 'id' });
+    if (error) { toast('Save failed'); return; }
+    toast('Wall panel saved');
+    await loadWallPanels();
+    render();
+  }
+
+  async function addWallPanel() {
+    const pos = ((state.c4.wallPanels || []).length) + 1;
+    const { data, error } = await sb.from('showroom_wall_panels').insert({ position: pos, name: null, note: null }).select().single();
+    if (error) { toast('Could not add panel'); return; }
+    state.c4.wallPanels = [...(state.c4.wallPanels || []), data];
+    render();
+  }
+
+  async function deleteWallPanel(id) {
+    if (!confirm('Remove this wall panel?')) return;
+    await sb.from('showroom_wall_panels').delete().eq('id', id);
+    await loadWallPanels();
+    render();
+  }
+
+  async function uploadWallPanelImage(id, file) {
+    if (!file) return;
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = id + '-' + Date.now() + '.' + ext;
+    const { error: upErr } = await sb.storage.from('showroom-images').upload(path, file, { upsert: true });
+    if (upErr) { toast('Image upload failed'); return; }
+    const { data: urlData } = sb.storage.from('showroom-images').getPublicUrl(path);
+    const publicUrl = urlData.publicUrl;
+    const { error: dbErr } = await sb.from('showroom_wall_panels').update({ image_url: publicUrl }).eq('id', id);
+    if (dbErr) { toast('Could not save image URL'); return; }
+    const panel = (state.c4.wallPanels || []).find(p => p.id === id);
+    if (panel) panel.image_url = publicUrl;
+    render();
+    toast('Image saved');
+  }
+
   function renderC4Showroom() {
     const bays = state.c4.showroomBays || [];
     const editing = state.c4.showroomEditing; // bay_number being edited, or null for new
@@ -1698,6 +1770,30 @@
         </div>
       </div>`;
 
+    /* ── wall panels section ── */
+    const wallPanels = state.c4.wallPanels || [];
+    const wallPanelCards = wallPanels.map(p => {
+      const imgEl = p.image_url
+        ? `<img class="c4-wall-panel-img" src="${esc(p.image_url)}" alt="Panel image" />`
+        : `<div class="c4-wall-panel-img-placeholder" data-action="c4-wp-img-pick" data-id="${esc(p.id)}">&#128247; Tap to add photo</div>`;
+      return `
+        <div class="c4-wall-panel-card">
+          <div class="c4-wall-panel-header">
+            <span class="c4-wall-panel-name">${p.name ? esc(p.name) : '<span style="color:var(--muted);font-style:italic;">Unnamed panel</span>'}</span>
+            <div style="display:flex;gap:6px;">
+              ${p.image_url ? `<button class="btn btn-ghost" data-action="c4-wp-img-pick" data-id="${esc(p.id)}" style="font-size:.72rem;padding:3px 8px;">&#128247; Change</button>` : ''}
+              <button class="btn btn-ghost" data-action="c4-wp-delete" data-id="${esc(p.id)}" style="font-size:.72rem;padding:3px 8px;color:#dc2626;">Remove</button>
+            </div>
+          </div>
+          <div class="c4-wall-panel-body">
+            ${imgEl}
+            <input class="text-input" id="wp-name-${esc(p.id)}" type="text" placeholder="Panel name / product" value="${esc(p.name || '')}" style="width:100%;" />
+            <input class="text-input" id="wp-note-${esc(p.id)}" type="text" placeholder="Notes (optional)" value="${esc(p.note || '')}" style="width:100%;" />
+            <button class="btn btn-primary" data-action="c4-wp-save" data-id="${esc(p.id)}" style="align-self:flex-start;">Save</button>
+          </div>
+        </div>`;
+    }).join('');
+
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-overview">&#8592; Categories</button></div>
       <div class="card">
@@ -1705,7 +1801,14 @@
         <p class="text-muted text-sm" style="margin-bottom:12px;">Record what's on display in each bay. Submitting a bay number overwrites the previous record for that bay.</p>
         ${bays.length ? bayCards : '<p class="text-muted text-sm">No bays recorded yet.</p>'}
         ${form}
-      </div>`;
+        <div class="c4-wall-section">
+          <div class="c4-wall-section-title">Showroom Wall Panels</div>
+          <p class="text-muted text-sm" style="margin-bottom:12px;">Record each wall section used to showcase panel ranges. Add a photo, product name, and any notes.</p>
+          ${wallPanelCards || '<p class="text-muted text-sm">No wall panels recorded yet.</p>'}
+          <button class="btn btn-ghost" data-action="c4-wp-add" style="margin-top:8px;width:100%;">+ Add wall panel</button>
+        </div>
+      </div>
+      <input type="file" id="c4-wp-img-input" accept="image/*" capture="environment" style="display:none;" />`;
   }
 
   async function saveShowroomBay() {
@@ -1724,6 +1827,71 @@
     await loadShowroomBays();
     render();
     toast('Bay saved');
+  }
+
+  /* ── derive unique option values from loaded items ── */
+  function c4FilterOptions(field) {
+    const items = state.c4.items || [];
+    const seen = new Set();
+    items.forEach(i => { if (i[field]) seen.add(i[field]); });
+    return Array.from(seen).sort();
+  }
+
+  function renderC4FilterBar() {
+    const f = state.c4.filters || {};
+    const open = state.c4.filterOpen || false;
+    const activeCount = [f.vendor, f.install_category, f.stocked, f.warehouse].filter(Boolean).length;
+    const badge = activeCount > 0 ? `<span class="c4-filter-badge">${activeCount}</span>` : '';
+
+    const vendorOpts = ['', ...c4FilterOptions('vendor')].map(v =>
+      `<option value="${esc(v)}" ${f.vendor === v ? 'selected' : ''}>${v ? esc(v) : 'All vendors'}</option>`).join('');
+    const installOpts = ['', ...c4FilterOptions('install_category')].map(v =>
+      `<option value="${esc(v)}" ${f.install_category === v ? 'selected' : ''}>${v ? esc(v) : 'All categories'}</option>`).join('');
+    const stockedOpts = [['', 'All items'], ['Yes', 'Stocked only'], ['No', 'Not stocked']].map(([val, label]) =>
+      `<option value="${val}" ${(f.stocked || '') === val ? 'selected' : ''}>${label}</option>`).join('');
+    const warehouseOpts = ['', ...c4FilterOptions('warehouse')].map(v =>
+      `<option value="${esc(v)}" ${f.warehouse === v ? 'selected' : ''}>${v ? 'Bay ' + esc(v) : 'All locations'}</option>`).join('');
+
+    const panel = open ? `
+      <div class="c4-filter-panel">
+        <div class="c4-filter-row">
+          <label class="c4-filter-label">Vendor</label>
+          <select class="c4-filter-select" data-action="c4-filter-change" data-field="vendor">${vendorOpts}</select>
+        </div>
+        <div class="c4-filter-row">
+          <label class="c4-filter-label">Install Category</label>
+          <select class="c4-filter-select" data-action="c4-filter-change" data-field="install_category">${installOpts}</select>
+        </div>
+        <div class="c4-filter-row">
+          <label class="c4-filter-label">Stocked</label>
+          <select class="c4-filter-select" data-action="c4-filter-change" data-field="stocked">${stockedOpts}</select>
+        </div>
+        <div class="c4-filter-row">
+          <label class="c4-filter-label">Warehouse Location</label>
+          <select class="c4-filter-select" data-action="c4-filter-change" data-field="warehouse">${warehouseOpts}</select>
+        </div>
+        ${activeCount > 0 ? `<button class="c4-filter-clear" data-action="c4-filter-clear">Clear all filters</button>` : ''}
+      </div>` : '';
+
+    return `<div class="c4-filter-bar">
+      <button class="c4-filter-toggle" data-action="c4-filter-toggle">
+        <span>&#9663; Filter</span>
+        ${badge}
+        <span style="margin-left:auto;font-size:.75rem;color:var(--muted);">${open ? 'Hide' : 'Show'}</span>
+      </button>
+      ${panel}
+    </div>`;
+  }
+
+  function applyC4Filters(items) {
+    const f = state.c4.filters || {};
+    return items.filter(i => {
+      if (f.vendor          && i.vendor           !== f.vendor)           return false;
+      if (f.install_category && i.install_category !== f.install_category) return false;
+      if (f.stocked         && i.stocked           !== f.stocked)          return false;
+      if (f.warehouse       && i.warehouse          !== f.warehouse)        return false;
+      return true;
+    });
   }
 
   function renderC4SubCats() {
@@ -1778,9 +1946,10 @@
     const subCat = state.c4.subCat || null;
     const inSubCat = subCat ? allItems.filter(i => (i.sub_category || 'Other') === subCat) : allItems;
     const q = (state.c4.search || '').toLowerCase().trim();
-    const filtered = q
+    const afterSearch = q
       ? inSubCat.filter(i => (i.name || '').toLowerCase().includes(q) || (i.sku || '').toLowerCase().includes(q) || (i.vendor || '').toLowerCase().includes(q))
       : inSubCat;
+    const filtered = applyC4Filters(afterSearch);
 
     /* group by sub_category */
     const groups = {};
@@ -1839,7 +2008,8 @@
         <div class="card-title">${esc(state.c4.subCat || (cat ? cat.name : ''))}</div>
         <p class="text-muted text-sm" style="margin-bottom:8px;">${countedTotal} of ${inSubCat.length} counted</p>
         <input class="text-input" type="text" placeholder="Search by name or SKU&hellip;"
-          value="${esc(state.c4.search || '')}" data-action="c4-search" style="margin-bottom:14px;width:100%;" />
+          value="${esc(state.c4.search || '')}" data-action="c4-search" style="margin-bottom:10px;width:100%;" />
+        ${renderC4FilterBar()}
         ${sections}
       </div>`;
   }
@@ -1960,7 +2130,7 @@
       if (mod === 'verifier')   { state.view = 'upload'; }
       if (mod === 'completion') { state.view = 'c2-home'; }
       if (mod === 'delivery')   { state.view = 'c3-home'; }
-      if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadC4EOLItems()]).then(render); }
+      if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadWallPanels(), loadC4EOLItems()]).then(render); }
       render(); return;
     }
     /* ── upload-cancel: clears staging/append state, returns home without wiping M2/M3 ── */
@@ -2029,6 +2199,7 @@
     if (action === 'c4-open-showroom') {
       state.view = 'c4-showroom';
       state.c4.showroomEditing = null;
+      loadWallPanels().then(render);
       render();
       loadShowroomBays().then(render);
       return;
@@ -2045,6 +2216,26 @@
     }
     if (action === 'c4-showroom-save') {
       saveShowroomBay();
+      return;
+    }
+    if (action === 'c4-wp-add') {
+      addWallPanel();
+      return;
+    }
+    if (action === 'c4-wp-save') {
+      saveWallPanel(btn.dataset.id);
+      return;
+    }
+    if (action === 'c4-wp-delete') {
+      deleteWallPanel(btn.dataset.id);
+      return;
+    }
+    if (action === 'c4-wp-img-pick') {
+      const fileInput = document.getElementById('c4-wp-img-input');
+      if (fileInput) {
+        fileInput._panelId = btn.dataset.id;
+        fileInput.click();
+      }
       return;
     }
     if (action === 'c4-open-eol') {
@@ -2096,11 +2287,23 @@
       clearBackorder(btn.dataset.id);
       return;
     }
+    if (action === 'c4-filter-toggle') {
+      state.c4.filterOpen = !state.c4.filterOpen;
+      render();
+      return;
+    }
+    if (action === 'c4-filter-clear') {
+      state.c4.filters = {};
+      render();
+      return;
+    }
     if (action === 'c4-open-cat') {
       state.c4.cat = btn.dataset.cat;
       state.c4.items = [];
       state.c4.search = '';
       state.c4.subCat = null;
+      state.c4.filters = {};
+      state.c4.filterOpen = false;
       state.view = 'c4-subcats';
       render();
       await loadC4Items(btn.dataset.cat);
@@ -2440,6 +2643,19 @@
      GLOBAL CHANGE + KEYDOWN HANDLERS
   ═══════════════════════════════════════════════ */
   document.addEventListener('input', e => {
+    if (e.target.id === 'c4-wp-img-input') {
+      const file = e.target.files && e.target.files[0];
+      const id = e.target._panelId;
+      if (file && id) uploadWallPanelImage(id, file);
+      e.target.value = '';
+      return;
+    }
+    if (e.target.dataset.action === 'c4-filter-change') {
+      state.c4.filters = state.c4.filters || {};
+      state.c4.filters[e.target.dataset.field] = e.target.value || '';
+      render();
+      return;
+    }
     if (e.target.dataset.action === 'c4-search') {
       state.c4.search = e.target.value;
       state.c4.searchFocused = true;
