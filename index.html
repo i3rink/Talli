@@ -547,7 +547,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.8.1';
+  const VERSION = 'v2.8.2';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1377,7 +1377,9 @@
     { key: 'wet_areas',   name: 'Wet Areas',     icon: '&#9711;' },
     { key: 'glassware',   name: 'Glassware',     icon: '&#9671;' },
     { key: 'brassware',   name: 'Brassware',     icon: '&#9672;' },
-    { key: 'furniture',   name: 'Furniture',     icon: '&#9636;' },
+    { key: 'furniture',   name: 'Furniture & Ceramics', icon: '&#9636;' },
+    { key: 'heating',       name: 'Heating',              icon: '&#9651;' },
+    { key: 'mirrors_cabinets', name: 'Mirrors & Cabinets',  icon: '&#9645;' },
     { key: 'sundries',    name: 'Sundries',      icon: '&#9637;' },
     { key: 'eol',         name: 'End of Line',   icon: '&#9735;', special: 'eol' },
     { key: 'misc',        name: 'Miscellaneous', icon: '&#9749;', special: 'misc' },
@@ -1552,8 +1554,12 @@
   async function loadC4Items(cat) {
     state.c4.loading = true;
     render();
-    const { data, error } = await sb.from('stock_items')
-      .select('*').eq('category', cat).order('sub_category').order('name');
+    /* furniture tile also covers ceramics */
+    const multiCats = cat === 'furniture' ? ['furniture', 'ceramics'] : null;
+    const query = sb.from('stock_items').select('*').order('sub_category').order('name');
+    const { data, error } = multiCats
+      ? await query.in('category', multiCats)
+      : await query.eq('category', cat);
     state.c4.loading = false;
     if (error) { toast('Could not load items'); state.c4.items = []; return; }
     state.c4.items = data || [];
