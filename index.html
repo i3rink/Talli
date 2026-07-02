@@ -296,6 +296,13 @@
 
     /* ── Module 4 category grid ── */
     .c4-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 8px; }
+    .c4-eol-group { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 8px; overflow: hidden; }
+    .c4-eol-group-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; cursor: pointer; background: var(--bg); user-select: none; gap: 10px; }
+    .c4-eol-group-header:active { background: var(--faint); }
+    .c4-eol-group-title { font-family: 'Bricolage Grotesque', sans-serif; font-weight: 700; font-size: .85rem; color: var(--text); flex: 1; }
+    .c4-eol-group-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .c4-eol-group-body { border-top: 1px solid var(--border); padding: 0 4px 4px; }
+    .c4-eol-chevron { display: inline-block; }
     .c4-cat {
       background: var(--bg); border: 1px solid var(--border); border-radius: 8px;
       padding: 14px 10px; text-align: center;
@@ -540,7 +547,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.8.0';
+  const VERSION = 'v2.8.1';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -652,6 +659,7 @@
     else if (v === 'c3-done')  root.innerHTML = renderC3Done();
     else if (v === 'c4-overview') root.innerHTML = renderC4Overview();
     else if (v === 'c4-misc')     root.innerHTML = renderC4Misc();
+    else if (v === 'c4-eol')       root.innerHTML = renderC4EOL();
     else if (v === 'c4-showroom')  root.innerHTML = renderC4Showroom();
     else if (v === 'c4-subcats') root.innerHTML = renderC4SubCats();
     else if (v === 'c4-category') {
@@ -1371,6 +1379,7 @@
     { key: 'brassware',   name: 'Brassware',     icon: '&#9672;' },
     { key: 'furniture',   name: 'Furniture',     icon: '&#9636;' },
     { key: 'sundries',    name: 'Sundries',      icon: '&#9637;' },
+    { key: 'eol',         name: 'End of Line',   icon: '&#9735;', special: 'eol' },
     { key: 'misc',        name: 'Miscellaneous', icon: '&#9749;', special: 'misc' },
     { key: 'showroom',    name: 'Showroom Bays',  icon: '&#9734;', special: 'showroom' },
     { key: 'goods_in',    name: 'Goods In',       icon: '&#9744;', special: 'goods_in' },
@@ -1389,6 +1398,15 @@
   function renderC4Overview() {
     const counts = state.c4.counts || {};
     const catCards = C4_CATS.map(c => {
+      if (c.special === 'eol') {
+        const n = (state.c4.eolItems || []).length;
+        return `
+      <div class="c4-cat" data-action="c4-open-eol" style="cursor:pointer;background:linear-gradient(135deg,#fff7ed,#fed7aa);">
+        <div class="c4-cat-icon">${c.icon}</div>
+        <div class="c4-cat-name">${esc(c.name)}</div>
+        <div class="c4-cat-count" style="background:#ffedd5;color:#c2410c;">${n} item${n === 1 ? '' : 's'}</div>
+      </div>`;
+      }
       if (c.special === 'misc') {
         const n = state.c4.miscCount || 0;
         return `
@@ -1429,6 +1447,104 @@
         <div class="card-title">Stock Checker</div>
         <p class="text-muted text-sm" style="margin-bottom:12px;">Pick a category, find the product, enter what's currently on the shelf.</p>
         <div class="c4-grid">${catCards}</div>
+      </div>`;
+  }
+
+  /* ── EOL — load all items where sku starts with EOL ── */
+  async function loadC4EOLItems() {
+    const { data, error } = await sb.from('stock_items')
+      .select('*')
+      .ilike('sku', 'EOL%')
+      .order('install_category')
+      .order('name');
+    if (error) { toast('Could not load EOL items'); state.c4.eolItems = []; return; }
+    state.c4.eolItems = data || [];
+  }
+
+  function renderC4EOL() {
+    const items = state.c4.eolItems;
+    if (!items) {
+      return `<div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-overview">&#8592; Categories</button></div>
+        <div class="card"><p class="text-muted">Loading&hellip;</p></div>`;
+    }
+    if (items.length === 0) {
+      return `
+        <div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-overview">&#8592; Categories</button></div>
+        <div class="card">
+          <div class="card-title">End of Line</div>
+          <div class="empty-state"><div class="icon">&#9989;</div><p>No EOL items found.</p></div>
+        </div>`;
+    }
+
+    /* group by install_category */
+    const groups = {};
+    items.forEach(i => {
+      const g = i.install_category || 'Uncategorised';
+      (groups[g] = groups[g] || []).push(i);
+    });
+    const groupKeys = Object.keys(groups).sort();
+
+    const sections = groupKeys.map(g => {
+      const grpItems = groups[g];
+      const isOpen = !!(state.c4.eolExpanded || {})[g];
+      const counted = grpItems.filter(i => i.current_qty !== null && i.current_qty !== undefined).length;
+      const rows = grpItems.map(i => {
+        const isBackordered = !!i.backorder_until;
+        const boTag = isBackordered
+          ? `<div class="c4-bo-tag" data-action="c4-bo-open" data-id="${esc(i.id)}">Back order &mdash; due ${esc(formatDateUK(i.backorder_until))}${i.backorder_note ? ': ' + esc(i.backorder_note) : ''}</div>`
+          : `<button class="c4-bo-add" data-action="c4-bo-open" data-id="${esc(i.id)}">+ Back order</button>`;
+        const boForm = state.c4.boOpenId === i.id ? `
+          <div class="c4-bo-form">
+            <input class="text-input" type="date" data-action="c4-bo-date" data-id="${esc(i.id)}" value="${i.backorder_until || ''}" />
+            <input class="text-input" type="text" placeholder="Note (optional)" data-action="c4-bo-note" data-id="${esc(i.id)}" value="${esc(i.backorder_note || '')}" style="flex:1;" />
+            <button class="btn btn-ghost" data-action="c4-bo-save" data-id="${esc(i.id)}">Save</button>
+            ${isBackordered ? `<button class="btn btn-ghost" data-action="c4-bo-clear" data-id="${esc(i.id)}">Clear</button>` : ''}
+          </div>` : '';
+        return `
+        <div class="c4-item-row${isBackordered ? ' c4-item-row-bo' : ''}${i.out_of_stock ? ' c4-item-row-oos' : ''}">
+          <div class="c4-item-info">
+            <div class="c4-item-name">${esc(i.name)}</div>
+            ${i.sku ? `<span class="item-sku">${esc(i.sku)}</span>` : ''}
+            ${i.out_of_stock ? `<span class="c4-oos-tag">Out of stock${i.oos_expected_label ? ' &mdash; ' + esc(i.oos_expected_label) : ''}</span>` : ''}
+            <div class="c4-loc-pills">
+              <span class="c4-loc-label">Location</span>
+              ${['7','9','11','SHO','19'].map(loc => `<button class="c4-loc-pill${(i.warehouse||'') === loc ? ' active' : ''}" data-action="c4-loc" data-id="${esc(i.id)}" data-loc="${loc}">${loc}</button>`).join('')}
+            </div>
+            ${boTag}
+            ${boForm}
+          </div>
+          <div class="c4-stepper">
+            <button class="c4-step-btn" data-action="c4-step" data-id="${esc(i.id)}" data-dir="-1">&minus;</button>
+            <input class="qty-input" type="tel" inputmode="numeric" placeholder="Qty"
+              value="${i.current_qty ?? ''}"
+              data-action="c4-qty-input" data-id="${esc(i.id)}" />
+            <button class="c4-step-btn" data-action="c4-step" data-id="${esc(i.id)}" data-dir="1">&plus;</button>
+          </div>
+        </div>`;
+      }).join('');
+
+      return `
+        <div class="c4-eol-group">
+          <div class="c4-eol-group-header" data-action="c4-eol-toggle" data-group="${esc(g)}">
+            <div class="c4-eol-group-title">${esc(g)}</div>
+            <div class="c4-eol-group-meta">
+              <span class="c4-cat-count">${grpItems.length} item${grpItems.length !== 1 ? 's' : ''}</span>
+              ${counted > 0 ? `<span class="c4-cat-count" style="background:#d1fae5;color:#059669;">${counted} counted</span>` : ''}
+              <span class="c4-eol-chevron" style="color:var(--muted);font-size:.85rem;transition:transform .2s;${isOpen ? 'transform:rotate(90deg);' : ''}">&rsaquo;</span>
+            </div>
+          </div>
+          ${isOpen ? `<div class="c4-eol-group-body">${rows}</div>` : ''}
+        </div>`;
+    }).join('');
+
+    const totalCounted = items.filter(i => i.current_qty !== null && i.current_qty !== undefined).length;
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c4-back-overview">&#8592; Categories</button></div>
+      <div class="card">
+        <div class="card-title">End of Line</div>
+        <p class="text-muted text-sm" style="margin-bottom:12px;">${totalCounted} of ${items.length} counted &mdash; tap a category to expand</p>
+        ${sections}
       </div>`;
   }
 
@@ -1838,7 +1954,7 @@
       if (mod === 'verifier')   { state.view = 'upload'; }
       if (mod === 'completion') { state.view = 'c2-home'; }
       if (mod === 'delivery')   { state.view = 'c3-home'; }
-      if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays()]).then(render); }
+      if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadC4EOLItems()]).then(render); }
       render(); return;
     }
     /* ── upload-cancel: clears staging/append state, returns home without wiping M2/M3 ── */
@@ -1923,6 +2039,20 @@
     }
     if (action === 'c4-showroom-save') {
       saveShowroomBay();
+      return;
+    }
+    if (action === 'c4-open-eol') {
+      state.view = 'c4-eol';
+      state.c4.eolExpanded = {};
+      render();
+      loadC4EOLItems().then(render);
+      return;
+    }
+    if (action === 'c4-eol-toggle') {
+      const g = btn.dataset.group;
+      state.c4.eolExpanded = state.c4.eolExpanded || {};
+      state.c4.eolExpanded[g] = !state.c4.eolExpanded[g];
+      render();
       return;
     }
     if (action === 'c4-open-misc') {
