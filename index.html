@@ -1,4 +1,4 @@
-<!-- Talli v2.8.9 — deployed 13 Jul 2026 -->
+<!-- Talli v2.8.10 — deployed 13 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -574,7 +574,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.8.9';
+  const VERSION = 'v2.8.10';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1696,8 +1696,9 @@
       reviewed:     false,
       image_url:    imageUrl,
     };
-    const { error } = await sb.from('misc_stock').insert(row);
-    if (error) { toast('Save failed — check connection'); return; }
+    const { data: insertData, error } = await sb.from('misc_stock').insert(row).select();
+    if (error) { toast('Save failed: ' + error.message); return; }
+    if (!insertData || insertData.length === 0) { toast('Save failed: no row returned — check RLS'); return; }
     state.c4.miscLoc      = null;
     state.c4.miscImgFile  = null;
     state.c4.miscImgPreview = null;
