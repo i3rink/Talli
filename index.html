@@ -1,4 +1,4 @@
-<!-- Talli v2.8.8 — deployed 13 Jul 2026 -->
+<!-- Talli v2.8.9 — deployed 13 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -574,7 +574,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.8.8';
+  const VERSION = 'v2.8.9';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1605,23 +1605,49 @@
 
   function renderC4Misc() {
     const items = state.c4.miscItems || [];
-    const rows = items.map(i => `
-      <div class="c4-item-row">
-        <div class="c4-item-info" style="flex:1;">
-          <div class="c4-item-name">${esc(i.description)}</div>
-          <div style="display:flex;gap:8px;align-items:center;margin-top:2px;">
+    const rows = items.map(i => {
+      const hasImg  = !!i.image_url;
+      const hasDesc = !!(i.description && i.description.trim());
+      return `
+      <div class="c4-item-row" style="align-items:flex-start;gap:10px;">
+        ${hasImg ? `<img src="${esc(i.image_url)}" style="width:56px;height:56px;object-fit:cover;border-radius:6px;flex-shrink:0;border:1px solid var(--border);" />` : ''}
+        <div class="c4-item-info" style="flex:1;min-width:0;">
+          ${hasDesc ? `<div class="c4-item-name" style="font-size:.85rem;">${esc(i.description)}</div>` : ''}
+          ${!hasDesc && !hasImg ? '<div class="c4-item-name" style="color:var(--muted);font-style:italic;">No description</div>' : ''}
+          <div style="display:flex;gap:6px;align-items:center;margin-top:3px;flex-wrap:wrap;">
             <span class="item-sku">Qty: ${i.qty ?? '—'}</span>
             ${i.warehouse ? `<span class="item-sku" style="background:#ede9fe;color:#7c3aed;">${esc(i.warehouse)}</span>` : ''}
           </div>
         </div>
         <button class="btn btn-ghost" data-action="c4-misc-delete" data-id="${esc(i.id)}" style="font-size:.75rem;padding:4px 8px;flex-shrink:0;">Remove</button>
-      </div>`).join('');
+      </div>`;
+    }).join('');
 
+    const preview = state.c4.miscImgPreview;
     const locs = ['7','9','11','SHO','19'];
     const form = `
       <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--border);">
-        <div class="card-title" style="font-size:.9rem;margin-bottom:10px;">Log an item</div>
-        <textarea class="text-input" id="misc-desc" placeholder="Describe the item&hellip;" rows="2" style="width:100%;margin-bottom:8px;resize:none;"></textarea>
+        <div class="card-title" style="font-size:.9rem;margin-bottom:4px;">Log an item</div>
+        <p class="text-muted text-sm" style="margin-bottom:12px;">Add a photo, a description, or both. At least one is required.</p>
+
+        <div style="margin-bottom:12px;">
+          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:6px;">Photo <span style="color:var(--muted);font-weight:400;">(tap to capture or choose)</span></label>
+          ${preview
+            ? `<div style="position:relative;display:inline-block;">
+                <img src="${esc(preview)}" style="width:100px;height:100px;object-fit:cover;border-radius:8px;border:1px solid var(--border);display:block;" />
+                <button data-action="c4-misc-img-clear" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:12px;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-weight:700;">&times;</button>
+               </div>
+               <br/><button class="btn btn-ghost" data-action="c4-misc-img-pick" style="margin-top:6px;font-size:.78rem;padding:5px 10px;">&#128247; Change photo</button>`
+            : `<button class="btn btn-ghost" data-action="c4-misc-img-pick" style="font-size:.85rem;padding:8px 14px;">&#128247; Add photo</button>`
+          }
+          <input type="file" id="c4-misc-img-input" accept="image/*" capture="environment" style="display:none;" />
+        </div>
+
+        <div style="margin-bottom:10px;">
+          <label style="font-size:.75rem;color:var(--text-muted);display:block;margin-bottom:4px;">Description <span style="color:var(--muted);font-weight:400;">(optional if photo added)</span></label>
+          <textarea class="text-input" id="misc-desc" placeholder="e.g. Roca toilet seat, white, box of 2&hellip;" rows="2" style="width:100%;resize:none;"></textarea>
+        </div>
+
         <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px;">
           <label style="font-size:.78rem;color:var(--text-muted);white-space:nowrap;">Qty</label>
           <input class="text-input" id="misc-qty" type="tel" inputmode="numeric" placeholder="0" style="width:70px;" />
@@ -1644,20 +1670,37 @@
   }
 
   async function saveMiscItem() {
-    const desc = (document.getElementById('misc-desc') || {}).value || '';
-    const qty  = (document.getElementById('misc-qty')  || {}).value || '';
-    const loc  = state.c4.miscLoc || null;
-    if (!desc.trim()) { toast('Please add a description'); return; }
+    const desc     = (document.getElementById('misc-desc') || {}).value || '';
+    const qty      = (document.getElementById('misc-qty')  || {}).value || '';
+    const loc      = state.c4.miscLoc || null;
+    const file     = state.c4.miscImgFile || null;
+    const hasDesc  = !!desc.trim();
+    const hasPhoto = !!file;
+    if (!hasDesc && !hasPhoto) { toast('Add a photo or description first'); return; }
+
+    let imageUrl = null;
+    if (hasPhoto) {
+      const ext  = (file.name.split('.').pop() || 'jpg').toLowerCase();
+      const path = 'misc/misc-' + Date.now() + '.' + ext;
+      const { error: upErr } = await sb.storage.from('showroom-images').upload(path, file, { upsert: true });
+      if (upErr) { toast('Photo upload failed — check connection'); return; }
+      const { data: urlData } = sb.storage.from('showroom-images').getPublicUrl(path);
+      imageUrl = urlData.publicUrl;
+    }
+
     const row = {
-      description:  desc.trim(),
+      description:  hasDesc ? desc.trim() : null,
       qty:          qty === '' ? null : Number(qty),
       warehouse:    loc,
       submitted_by: state.role || 'warehouse',
       reviewed:     false,
+      image_url:    imageUrl,
     };
     const { error } = await sb.from('misc_stock').insert(row);
     if (error) { toast('Save failed — check connection'); return; }
-    state.c4.miscLoc = null;
+    state.c4.miscLoc      = null;
+    state.c4.miscImgFile  = null;
+    state.c4.miscImgPreview = null;
     await loadMiscItems();
     render();
     toast('Item logged');
@@ -2332,7 +2375,9 @@
     }
     if (action === 'c4-open-misc') {
       state.view = 'c4-misc';
-      state.c4.miscLoc = null;
+      state.c4.miscLoc       = null;
+      state.c4.miscImgFile   = null;
+      state.c4.miscImgPreview = null;
       render();
       loadMiscItems().then(render);
       return;
@@ -2351,6 +2396,17 @@
     }
     if (action === 'c4-misc-delete') {
       deleteMiscItem(btn.dataset.id);
+      return;
+    }
+    if (action === 'c4-misc-img-pick') {
+      const fi = document.getElementById('c4-misc-img-input');
+      if (fi) fi.click();
+      return;
+    }
+    if (action === 'c4-misc-img-clear') {
+      state.c4.miscImgFile    = null;
+      state.c4.miscImgPreview = null;
+      render();
       return;
     }
     if (action === 'c4-bo-open') {
