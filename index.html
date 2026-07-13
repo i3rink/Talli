@@ -1,4 +1,4 @@
-<!-- Talli v2.8.11 — deployed 13 Jul 2026 -->
+<!-- Talli v2.8.12 — deployed 13 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -574,7 +574,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.8.11';
+  const VERSION = 'v2.8.12';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -2408,7 +2408,18 @@
     }
     if (action === 'c4-misc-img-pick') {
       const fi = document.getElementById('c4-misc-img-input');
-      if (fi) fi.click();
+      if (fi) {
+        /* bind fresh each time — render() replaces the DOM so _bound flags are unreliable */
+        fi.onchange = function() {
+          const file = this.files && this.files[0];
+          if (!file) return;
+          state.c4.miscImgFile = file;
+          const reader = new FileReader();
+          reader.onload = e => { state.c4.miscImgPreview = e.target.result; render(); };
+          reader.readAsDataURL(file);
+        };
+        fi.click();
+      }
       return;
     }
     if (action === 'c4-misc-img-clear') {
