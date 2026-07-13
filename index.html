@@ -1,4 +1,4 @@
-<!-- Talli v2.8.7 — deployed 02 Jul 2026 -->
+<!-- Talli v2.8.8 — deployed 13 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -574,7 +574,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.8.7';
+  const VERSION = 'v2.8.8';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1744,7 +1744,10 @@
         const val = b[key];
         const imgUrl = b[key + '_image'];
         const imgEl = imgUrl
-          ? `<img class="c4-bay-img-thumb" src="${esc(imgUrl)}" alt="${esc(f)}" data-action="c4-bay-img-pick" data-bay="${esc(String(b.bay_number))}" data-field="${esc(key)}" title="Tap to change photo" />`
+          ? `<div style="position:relative;display:inline-block;">
+              <img class="c4-bay-img-thumb" src="${esc(imgUrl)}" alt="${esc(f)}" data-action="c4-bay-img-pick" data-bay="${esc(String(b.bay_number))}" data-field="${esc(key)}" title="Tap to change photo" />
+              <button class="c4-bay-img-del-btn" data-action="c4-bay-img-del" data-bay="${esc(String(b.bay_number))}" data-field="${esc(key)}" title="Remove photo" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#ef4444;color:#fff;border:none;font-size:12px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0;font-weight:700;">&times;</button>
+            </div>`
           : `<div class="c4-bay-img-add" data-action="c4-bay-img-pick" data-bay="${esc(String(b.bay_number))}" data-field="${esc(key)}" title="Add photo">&#128247;</div>`;
         return `
           <div class="c4-bay-field-row">
@@ -1868,6 +1871,27 @@
     if (bay) bay[col] = publicUrl;
     render();
     toast('Photo saved');
+  }
+
+  async function clearBayFieldImage(bayNumber, fieldKey) {
+    if (!confirm('Remove this photo?')) return;
+    const col = fieldKey + '_image';
+    /* get current URL so we can delete from storage */
+    const bay = (state.c4.showroomBays || []).find(b => String(b.bay_number) === String(bayNumber));
+    const currentUrl = bay ? bay[col] : null;
+    /* null out the DB column */
+    const { error: dbErr } = await sb.from('showroom_bays').update({ [col]: null }).eq('bay_number', bayNumber);
+    if (dbErr) { toast('Could not remove photo'); return; }
+    /* attempt to delete from storage — best effort, don't block on error */
+    if (currentUrl) {
+      const parts = currentUrl.split('/showroom-images/');
+      if (parts[1]) {
+        await sb.storage.from('showroom-images').remove([parts[1]]);
+      }
+    }
+    if (bay) bay[col] = null;
+    render();
+    toast('Photo removed');
   }
 
   /* ── derive unique option values from loaded items ── */
@@ -2266,6 +2290,10 @@
         fileInput._field = btn.dataset.field;
         fileInput.click();
       }
+      return;
+    }
+    if (action === 'c4-bay-img-del') {
+      clearBayFieldImage(btn.dataset.bay, btn.dataset.field);
       return;
     }
     if (action === 'c4-wp-add') {
