@@ -1,4 +1,4 @@
-<!-- Talli v2.8.13 — deployed 13 Jul 2026 -->
+<!-- Talli v2.8.15 — deployed 13 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -574,7 +574,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.8.13';
+  const VERSION = 'v2.8.15';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -622,7 +622,7 @@
     catExpanded:     {},   /* category open/closed state in check view */
     catSubmitted:    {},   /* categories marked done by user */
     /* module 2 — pick completion */
-    c2: { session: null, selectedJob: null, picks: {}, loading: false },
+    c2: { session: null, selectedJob: null, picks: {}, loading: false, pickerName: '' },
     /* module 3 — driver delivery */
     c3: { jobRef: '', items: [], delivered: {}, driverName: '', loading: false, session: null },
     /* module 4 — stock checker */
@@ -1189,13 +1189,15 @@
       <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
       <div class="card">
         <div class="card-title">Pick Completion</div>
-        <p class="text-muted text-sm" style="margin-bottom:14px;">Enter the session code from Pick Verifier to load this week&#8217;s jobs.</p>
-        <div class="flex gap-2 flex-wrap items-center">
-          <input id="c2-code" type="text" placeholder="e.g. AB3K7P" autocapitalize="characters"
-            style="flex:1;min-width:160px;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
-          <button class="btn btn-primary" data-action="c2-load">Load Session &#8594;</button>
+        <p class="text-muted text-sm" style="margin-bottom:16px;">Enter a job number to load the pick list for that job.</p>
+        <div style="display:flex;flex-direction:column;gap:10px;">
+          <input id="c2-job" type="text" placeholder="Job number e.g. 1659" autocapitalize="off"
+            style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
+          <input id="c2-picker" type="text" placeholder="Your name (optional)"
+            style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" value="${esc(state.c2.pickerName || '')}" />
+          <button class="btn btn-primary" data-action="c2-load" style="width:100%;">Find Job &#8594;</button>
         </div>
-        ${state.c2.loading ? `<p class="text-muted text-sm mt-2">Loading&#8230;</p>` : ''}
+        ${state.c2.loading ? `<p class="text-muted text-sm mt-2">Looking up job&#8230;</p>` : ''}
       </div>`;
   }
 
@@ -1203,23 +1205,37 @@
     const s    = state.c2.session;
     const jobs = s.jobs || [];
     const jobRows = jobs.map(jobRef => {
-      /* Count items that appear on this specific job's packing slip */
-      const items = s.masterList.filter(i => i.jobs && i.jobs.includes(jobRef));
-      const picks = state.c2.picks[jobRef] || {};
+      const items   = s.masterList.filter(i => i.jobs && i.jobs.includes(jobRef));
+      const picks   = state.c2.picks[jobRef] || {};
       const entered = Object.values(picks).filter(p => p.qty !== null && p.qty !== undefined).length;
+      const total   = items.length;
+      let ragColour, ragLabel;
+      if (entered === 0) {
+        ragColour = '#ef4444'; ragLabel = 'Not started';
+      } else if (entered >= total) {
+        ragColour = '#059669'; ragLabel = 'Complete';
+      } else {
+        ragColour = '#f59e0b'; ragLabel = entered + '/' + total + ' picked';
+      }
       return `
         <div class="item-row" style="cursor:pointer;" data-action="c2-select-job" data-job="${esc(jobRef)}">
-          <div class="item-name">${esc(displayJobRef(jobRef))}</div>
-          <div class="item-qty">${items.length} item${items.length !== 1 ? 's' : ''}</div>
-          ${entered > 0 ? `<span class="job-tag">${entered} entered</span>` : ''}
+          <div style="width:10px;height:10px;border-radius:50%;background:${ragColour};flex-shrink:0;"></div>
+          <div class="item-name" style="flex:1;">${esc(displayJobRef(jobRef))}</div>
+          <div style="font-size:.78rem;color:#6b7280;white-space:nowrap;">${ragLabel}</div>
           <div style="color:var(--muted);font-size:1.2rem;flex-shrink:0;">&#8250;</div>
         </div>`;
     }).join('');
+
+    const notStarted = jobs.filter(j => {
+      const picks = state.c2.picks[j] || {};
+      return Object.values(picks).filter(p => p.qty !== null && p.qty !== undefined).length === 0;
+    }).length;
+
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
       <div class="card">
-        <div class="card-title">Jobs &mdash; ${esc(s.code)}</div>
-        <p class="text-muted text-sm" style="margin-bottom:14px;">${jobs.length} job${jobs.length !== 1 ? 's' : ''} on this session. Select one to start picking.</p>
+        <div class="card-title">Jobs this week &mdash; ${esc(s.code)}</div>
+        <p class="text-muted text-sm" style="margin-bottom:14px;">${jobs.length} job${jobs.length !== 1 ? 's' : ''} on this session${notStarted > 0 ? ' &middot; <span style="color:#ef4444;font-weight:600;">' + notStarted + ' not started</span>' : ' &middot; <span style="color:#059669;font-weight:600;">all picked</span>'}.</p>
         <div class="item-list">${jobRows}</div>
       </div>`;
   }
@@ -1259,7 +1275,10 @@
     }).join('');
 
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="c2-back-jobs">&#8592; Jobs</button></div>
+      <div class="mod-back" style="display:flex;gap:8px;align-items:center;">
+        <button class="btn btn-ghost" data-action="go-home">&#8592; Home</button>
+        <button class="btn btn-ghost" data-action="c2-back-jobs" style="font-size:.8rem;">&#9776; All jobs this week</button>
+      </div>
       <div class="card">
         <div class="flex justify-between items-center" style="margin-bottom:10px;">
           <div>
@@ -2481,7 +2500,7 @@
     if (action === 'go-home') {
       state.module = 'home'; state.view = 'home';
       state.dash = { loading: true, m1: [], m2: [], m3: [] };
-      state.c2 = { session: null, selectedJob: null, picks: {}, loading: false };
+      state.c2 = { session: null, selectedJob: null, picks: {}, loading: false, pickerName: state.c2.pickerName };
       state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null };
       state.catExpanded = {};
       state.catSubmitted = {};
@@ -3925,31 +3944,51 @@
   }
 
   async function loadC2Session() {
-    const el = document.getElementById('c2-code');
-    if (!el) return;
-    const code = el.value.trim().toUpperCase().replace(/[\s\-]/g, '');
-    if (!code) { toast('Enter a session code'); return; }
+    const jobEl    = document.getElementById('c2-job');
+    const pickerEl = document.getElementById('c2-picker');
+    if (!jobEl) return;
+    const raw = jobEl.value.trim();
+    if (!raw) { toast('Enter a job number'); return; }
+    const jobNum = displayJobRef(raw.replace(/^Q/i, '').trim()) || raw.trim();
+    state.c2.pickerName = pickerEl ? pickerEl.value.trim() : '';
     state.c2.loading = true; render();
-    const tryCode = async (c) => sb.from('sessions').select('*').eq('code', c).single();
-    let { data, error } = await tryCode(code);
-    if (error || !data) {
-      const dashed = code.replace(/^(AB)(\d{4})(.+)$/, '$1-$2-$3');
-      if (dashed !== code) { const r = await tryCode(dashed); data = r.data; error = r.error; }
+
+    /* search recent sessions for one containing this job */
+    const { data: sessions } = await sb.from('sessions').select('*').order('created_at', { ascending: false }).limit(30);
+    const matched = (sessions || []).find(s =>
+      (s.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum) ||
+      (s.master_list || []).some(i => (i.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum))
+    );
+
+    if (!matched) {
+      state.c2.loading = false;
+      toast('No session found for job ' + jobNum + '. Has Pick Verifier been run for this job?');
+      render(); return;
     }
-    state.c2.loading = false;
-    if (error || !data) { toast('Session not found \u2014 check the code'); render(); return; }
-    const masterList = (data.master_list || []).map(item => ({
+
+    const masterList = (matched.master_list || []).map(item => ({
       ...item,
       jobs: (item.jobs || []).map(normJobRef),
-      /* preserve jobQtys if stored, otherwise fall back gracefully */
       jobQtys: item.jobQtys || {},
     }));
-    const jobSet = new Set();
-    masterList.forEach(item => (item.jobs || []).forEach(j => jobSet.add(j)));
-    if (jobSet.size === 0) (data.jobs || []).forEach(j => jobSet.add(normJobRef(j)));
-    const jobs = [...jobSet].sort();
-    state.c2.session = { id: data.id, code: data.code, masterList, jobs };
-    const { data: existing } = await sb.from('pick_completions').select('*').eq('session_id', data.id);
+
+    const items = masterList
+      .filter(i => (i.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum))
+      .map(i => ({
+        ...i,
+        qty: (i.jobQtys && i.jobQtys[jobNum] != null) ? i.jobQtys[jobNum]
+           : (i.jobQtys && i.jobQtys['Q' + jobNum] != null) ? i.jobQtys['Q' + jobNum]
+           : i.qty,
+      }));
+
+    if (!items.length) {
+      state.c2.loading = false;
+      toast('No items found for job ' + jobNum);
+      render(); return;
+    }
+
+    /* load existing pick completions for this session */
+    const { data: existing } = await sb.from('pick_completions').select('*').eq('session_id', matched.id);
     if (existing && existing.length) {
       existing.forEach(row => {
         if (!state.c2.picks[row.job_ref]) state.c2.picks[row.job_ref] = {};
@@ -3958,7 +3997,20 @@
         }
       });
     }
-    state.view = 'c2-jobs'; render();
+
+    const jobSet = new Set();
+    masterList.forEach(item => (item.jobs || []).forEach(j => jobSet.add(j)));
+    if (jobSet.size === 0) (matched.jobs || []).forEach(j => jobSet.add(normJobRef(j)));
+
+    state.c2.session     = { id: matched.id, code: matched.code, masterList, jobs: [...jobSet].sort() };
+    state.c2.selectedJob = normJobRef('Q' + jobNum);
+    /* if normJobRef with Q prefix doesn't match, try without */
+    if (!state.c2.session.jobs.includes(state.c2.selectedJob)) {
+      const direct = masterList.find(i => (i.jobs || []).some(j => displayJobRef(normJobRef(j)) === jobNum));
+      state.c2.selectedJob = direct ? direct.jobs.find(j => displayJobRef(normJobRef(j)) === jobNum) : state.c2.selectedJob;
+    }
+    state.c2.loading = false;
+    state.view = 'c2-pick'; render();
   }
 
   async function submitC2Picks() {
