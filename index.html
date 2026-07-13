@@ -1,4 +1,4 @@
-<!-- Talli v2.8.10 — deployed 13 Jul 2026 -->
+<!-- Talli v2.8.11 — deployed 13 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -574,7 +574,7 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
   };
-  const VERSION = 'v2.8.10';
+  const VERSION = 'v2.8.11';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1670,24 +1670,30 @@
   }
 
   async function saveMiscItem() {
+    toast('DEBUG: save started');
     const desc     = (document.getElementById('misc-desc') || {}).value || '';
     const qty      = (document.getElementById('misc-qty')  || {}).value || '';
     const loc      = state.c4.miscLoc || null;
     const file     = state.c4.miscImgFile || null;
     const hasDesc  = !!desc.trim();
     const hasPhoto = !!file;
+    toast('DEBUG: hasDesc=' + hasDesc + ' hasPhoto=' + hasPhoto);
     if (!hasDesc && !hasPhoto) { toast('Add a photo or description first'); return; }
 
     let imageUrl = null;
     if (hasPhoto) {
+      toast('DEBUG: starting upload');
       const ext  = (file.name.split('.').pop() || 'jpg').toLowerCase();
       const path = 'misc/misc-' + Date.now() + '.' + ext;
       const { error: upErr } = await sb.storage.from('showroom-images').upload(path, file, { upsert: true });
-      if (upErr) { toast('Photo upload failed — check connection'); return; }
+      if (upErr) { toast('Upload error: ' + upErr.message); return; }
+      toast('DEBUG: upload ok, getting URL');
       const { data: urlData } = sb.storage.from('showroom-images').getPublicUrl(path);
-      imageUrl = urlData.publicUrl;
+      imageUrl = urlData ? urlData.publicUrl : null;
+      toast('DEBUG: imageUrl=' + (imageUrl ? 'ok' : 'null'));
     }
 
+    toast('DEBUG: inserting row');
     const row = {
       description:  hasDesc ? desc.trim() : null,
       qty:          qty === '' ? null : Number(qty),
@@ -1697,8 +1703,9 @@
       image_url:    imageUrl,
     };
     const { data: insertData, error } = await sb.from('misc_stock').insert(row).select();
-    if (error) { toast('Save failed: ' + error.message); return; }
-    if (!insertData || insertData.length === 0) { toast('Save failed: no row returned — check RLS'); return; }
+    if (error) { toast('Insert error: ' + error.message); return; }
+    if (!insertData || insertData.length === 0) { toast('Insert: no row returned — RLS may be blocking'); return; }
+    toast('DEBUG: insert ok');
     state.c4.miscLoc      = null;
     state.c4.miscImgFile  = null;
     state.c4.miscImgPreview = null;
