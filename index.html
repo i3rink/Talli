@@ -1400,7 +1400,9 @@
     function radioGroup(name, options, current) {
       return options.map(([val, label]) => {
         const checked = current === val ? 'checked' : '';
-        return `<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid ${current === val ? 'var(--teal)' : 'var(--border)'};border-radius:8px;cursor:pointer;font-size:.9rem;background:${current === val ? 'var(--teal-faint)' : 'var(--surface)'};">
+        const border  = current === val ? 'var(--teal)' : 'var(--border)';
+        const bg      = current === val ? 'var(--teal-faint)' : 'var(--surface)';
+        return `<label style="display:flex;align-items:center;gap:8px;padding:10px 12px;border:1.5px solid ${border};border-radius:8px;cursor:pointer;font-size:.9rem;background:${bg};">
           <input type="radio" name="${name}" value="${esc(val)}" ${checked} data-action="c3-signoff-radio" data-field="${name}" style="accent-color:var(--teal);" />
           ${esc(label)}
         </label>`;
@@ -1411,74 +1413,71 @@
       ? `<img src="${esc(s.photoPreview)}" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px;margin-top:6px;" />`
       : '';
 
+    const jobLabel    = esc(displayJobRef(state.c3.jobRef));
+    const postcodeVal = esc(s.postcode || '');
+    const notesVal    = esc(s.notes || '');
+    const teamHtml    = radioGroup('c3-team', [['Team 1','Team 1'],['Team 2','Team 2']], s.team || '');
+    const statusHtml  = radioGroup('c3-deliverystatus', [
+      ['all',     'Yes \u2014 all delivered'],
+      ['partial', 'Partial \u2014 some items not delivered'],
+      ['failed',  'No delivery \u2014 delivery failed'],
+    ], s.deliveryStatus || '');
+    const presentHtml = radioGroup('c3-customerpresent', [
+      ['yes',       'Yes'],
+      ['neighbour', 'No \u2014 left with neighbour'],
+      ['agreed',    'No \u2014 left in agreed location'],
+    ], s.customerPresent || '');
+    const photoBtn = s.photoPreview ? '&#128247; Change photo' : '&#128247; Add photo';
+
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="c3-back-to-check">&#8592; Back to items</button></div>
       <div class="card">
-        <div class="card-title">Delivery Sign-off &mdash; \${esc(displayJobRef(state.c3.jobRef))}</div>
+        <div class="card-title">Delivery Sign-off &mdash; ${jobLabel}</div>
 
-        <div style="display:flex;flex-direction:column;gap:16px;">
-
-          <div style="\${groupStyle}">
-            <label style="\${labelStyle}">Customer postcode</label>
-            <input id="c3-postcode" type="text" placeholder="e.g. AB12 3CD" autocapitalize="characters"
-              style="\${inputStyle}" value="\${esc(s.postcode || '')}" />
-          </div>
-
-          <div style="\${groupStyle}">
-            <label style="\${labelStyle}">Delivery team</label>
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              \${radioGroup('c3-team', [['Team 1','Team 1'],['Team 2','Team 2']], s.team || '')}
-            </div>
-          </div>
-
-          <div style="\${groupStyle}">
-            <label style="\${labelStyle}">Materials delivered?</label>
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              \${radioGroup('c3-deliverystatus', [
-                ['all','Yes — all delivered'],
-                ['partial','Partial — some items not delivered'],
-                ['failed','No delivery — delivery failed']
-              ], s.deliveryStatus || '')}
-            </div>
-          </div>
-
-          <div style="\${groupStyle}">
-            <label style="\${labelStyle}">Customer present?</label>
-            <div style="display:flex;flex-direction:column;gap:6px;">
-              \${radioGroup('c3-customerpresent', [
-                ['yes','Yes'],
-                ['neighbour','No — left with neighbour'],
-                ['agreed','No — left in agreed location']
-              ], s.customerPresent || '')}
-            </div>
-          </div>
-
-          <div style="\${groupStyle}">
-            <label style="\${labelStyle}">Issues / notes</label>
-            <textarea id="c3-notes" rows="3" placeholder="Any issues, damage, access problems..."
-              style="\${inputStyle}resize:vertical;">\${esc(s.notes || '')}</textarea>
-          </div>
-
-          <div style="\${groupStyle}">
-            <label style="\${labelStyle}">Photo of materials at site</label>
-            \${photoPreview}
-            <button class="btn btn-ghost" data-action="c3-photo-pick" style="width:100%;">
-              \${s.photoPreview ? '&#128247; Change photo' : '&#128247; Add photo'}
-            </button>
-            <input type="file" id="c3-photo-input" accept="image/*" capture="environment" style="display:none;" />
-          </div>
-
-          <div style="\${groupStyle}">
-            <label style="\${labelStyle}">Driver signature</label>
-            <canvas id="c3-sig-canvas" width="600" height="180"
-              style="width:100%;border:1.5px solid var(--border);border-radius:8px;background:#fff;touch-action:none;display:block;"></canvas>
-            <button class="btn btn-ghost" data-action="c3-sig-clear" style="align-self:flex-start;font-size:.8rem;padding:5px 12px;">Clear signature</button>
-          </div>
-
-          <button class="btn btn-primary" data-action="c3-submit" style="width:100%;padding:14px;">
-            Submit delivery
-          </button>
+        <div style="${groupStyle}margin-bottom:16px;">
+          <label style="${labelStyle}">Customer postcode</label>
+          <input id="c3-postcode" type="text" placeholder="e.g. AB12 3CD" autocapitalize="characters"
+            style="${inputStyle}" value="${postcodeVal}" />
         </div>
+
+        <div style="${groupStyle}margin-bottom:16px;">
+          <label style="${labelStyle}">Delivery team</label>
+          <div style="display:flex;flex-direction:column;gap:6px;">${teamHtml}</div>
+        </div>
+
+        <div style="${groupStyle}margin-bottom:16px;">
+          <label style="${labelStyle}">Materials delivered?</label>
+          <div style="display:flex;flex-direction:column;gap:6px;">${statusHtml}</div>
+        </div>
+
+        <div style="${groupStyle}margin-bottom:16px;">
+          <label style="${labelStyle}">Customer present?</label>
+          <div style="display:flex;flex-direction:column;gap:6px;">${presentHtml}</div>
+        </div>
+
+        <div style="${groupStyle}margin-bottom:16px;">
+          <label style="${labelStyle}">Issues / notes</label>
+          <textarea id="c3-notes" rows="3" placeholder="Any issues, damage, access problems..."
+            style="${inputStyle}resize:vertical;">${notesVal}</textarea>
+        </div>
+
+        <div style="${groupStyle}margin-bottom:16px;">
+          <label style="${labelStyle}">Photo of materials at site</label>
+          ${photoPreview}
+          <button class="btn btn-ghost" data-action="c3-photo-pick" style="width:100%;">${photoBtn}</button>
+          <input type="file" id="c3-photo-input" accept="image/*" capture="environment" style="display:none;" />
+        </div>
+
+        <div style="${groupStyle}margin-bottom:16px;">
+          <label style="${labelStyle}">Driver signature</label>
+          <canvas id="c3-sig-canvas" width="600" height="180"
+            style="width:100%;border:1.5px solid var(--border);border-radius:8px;background:#fff;touch-action:none;display:block;"></canvas>
+          <button class="btn btn-ghost" data-action="c3-sig-clear" style="align-self:flex-start;font-size:.8rem;padding:5px 12px;">Clear signature</button>
+        </div>
+
+        <button class="btn btn-primary" data-action="c3-submit" style="width:100%;padding:14px;">
+          Submit delivery
+        </button>
       </div>`;
   }
 
