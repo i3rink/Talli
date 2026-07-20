@@ -2,7 +2,7 @@
   "name": "Talli",
   "short_name": "Talli",
   "description": "Talli - Annick Bathrooms warehouse and stock management",
-  "start_url": "/Annickpicker/",
+  "start_url": "/talli/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0075ab",
