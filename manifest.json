@@ -1,7 +1,7 @@
 {
-  "name": "Annick Picker",
-  "short_name": "Annick Picker",
-  "description": "Annick Bathrooms stock checking tool",
+  "name": "Talli",
+  "short_name": "Talli",
+  "description": "Talli - Annick Bathrooms warehouse and stock management",
   "start_url": "/Annickpicker/",
   "display": "standalone",
   "background_color": "#ffffff",
