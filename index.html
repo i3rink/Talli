@@ -2258,6 +2258,7 @@
     if (error) { toast('Save failed - check connection'); return; }
     const item = (state.c4.items || []).find(i => i.id === id);
     if (item) item.current_qty = val;
+    state.c4.counts = null; state.c4.countedCounts = null;
     /* count history - append only, never blocks the main save if it fails */
     sb.from('stock_count_log').insert({ item_id: id, qty: val, counted_by: countedBy, counted_at: countedAt });
   }
