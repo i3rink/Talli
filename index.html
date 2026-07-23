@@ -4534,39 +4534,55 @@
      MODULE 5 — GOODS IN
   ═══════════════════════════════════════════════ */
 
-  /* ── PO PDF parser — same engine as M1 packing slips ── */
+  /* ── PO / Invoice PDF parser — handles Moon Invoice PO and Invoice formats ── */
   function parsePurchaseOrder(text, filename) {
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    /* PO number: "P.O. # 201" or "P.O.# 201" */
-    const poMatch   = text.match(/P\.?\s*O\.?\s*#\s*(\S+)/i);
-    const poNumber  = poMatch ? poMatch[1].trim() : filename.replace(/\.pdf$/i, '');
-    /* Date: "Date 18 Jul 2026" */
+
+    /* Doc type and reference number — covers "P.O. # 201" and "Invoice # t206" */
+    const poMatch  = text.match(/P\.?\s*O\.?\s*#\s*(\S+)/i);
+    const invMatch = text.match(/Invoice\s*#\s*(\S+)/i);
+    const docRef   = poMatch ? poMatch[1].trim() : invMatch ? invMatch[1].trim() : filename.replace(/\.pdf$/i, '');
+    const docType  = poMatch ? 'PO' : invMatch ? 'INV' : 'REF';
+
+    /* Date */
     const dateMatch = text.match(/Date\s+(\d{1,2}\s+\w+\s+\d{4})/i);
     const poDate    = dateMatch ? dateMatch[1].trim() : '';
-    /* Vendor: line after "Vendor To:" */
+
+    /* Supplier / recipient — "Vendor To:" for POs, "Invoice To:" for invoices */
     let supplier = '';
     const vendorIdx = lines.findIndex(l => /vendor\s+to/i.test(l));
-    if (vendorIdx >= 0 && lines[vendorIdx + 1]) supplier = lines[vendorIdx + 1].trim();
+    const invoiceToIdx = lines.findIndex(l => /invoice\s+to/i.test(l));
+    const nameIdx = vendorIdx >= 0 ? vendorIdx : invoiceToIdx;
+    if (nameIdx >= 0 && lines[nameIdx + 1]) supplier = lines[nameIdx + 1].trim();
+
+    /* Line item regex — Moon Invoice table format:
+       "1. Product Name  qty [unit]  £price  £amount"
+       The £ anchor stops the qty being consumed by the name */
+    const ITEM_MOON = /^(\d+)\.\s+(.+?)\s+(\d+(?:\.\d+)?)\s*(?:pcs|bundle|box|pk|2pk|3pk|4pk|pair|roll|m|lm|set|kit|each|no\.?|nr\.)?\s*£/i;
+    const SKU_RE_LOCAL = /^[A-Z0-9][A-Z0-9\-_]{2,}$/i;
 
     const items = [];
     let i = 0;
     while (i < lines.length) {
       const line = lines[i];
-      const m = line.match(ITEM_RE) || line.match(ITEM_RE2);
+      const m = line.match(ITEM_MOON) || line.match(ITEM_RE) || line.match(ITEM_RE2);
       if (m) {
         const name = m[2].trim();
         const qty  = parseFloat(m[3]);
+        /* unit only present in ITEM_RE / ITEM_RE2 matches */
         const unit = normaliseUnit(m[4] || '');
         let j = i + 1, sku = '';
-        if (j < lines.length && SKU_RE.test(lines[j]) && !/^\d+\.\s/.test(lines[j])) {
+        if (j < lines.length && SKU_RE_LOCAL.test(lines[j]) && !/^\d+\.\s/.test(lines[j])) {
           sku = lines[j].toUpperCase(); j++;
         }
+        /* skip Moon Invoice table header row */
+        if (/^products$/i.test(name) || /^#\s*products/i.test(name)) { i++; continue; }
         items.push({ name, sku, qty, unit });
         i = j; continue;
       }
       i++;
     }
-    return { poNumber, supplier, poDate, items };
+    return { poNumber: `${docType}-${docRef}`, supplier, poDate, items };
   }
 
   /* ── Supabase: load PO list ── */
