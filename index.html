@@ -795,9 +795,7 @@
       <div class="dash-wrap">
         <div class="dash-heading">
           <span class="dash-heading-title">Pending actions</span>
-          ${state.dashUnlocked ? `
-            <button class="btn btn-ghost" data-action="open-module" data-mod="goodsin" style="padding:6px 12px;font-size:.78rem;color:#0d9488;border-color:#0d9488;">&#8628; Goods In</button>
-            <button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>` : ''}
+          ${state.dashUnlocked ? `<button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>` : ''}
         </div>
         <div id="dashboard">${state.dashUnlocked ? '<div class="dash-loading">Loading&#8230;</div>' : renderDashLock()}</div>
       </div>`;
@@ -2394,10 +2392,6 @@
       if (mod === 'delivery')   { state.view = 'c3-home'; }
       if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadWallPanels(), loadC4EOLItems()]).then(render); }
       if (mod === 'goodsin')    {
-        /* PIN gate — same check as dashboard unlock */
-        const pin = prompt('Goods In — admin PIN required:');
-        if (!pin) return;
-        if (String(pin).trim() !== String(DASH_PIN)) { toast('Incorrect PIN'); return; }
         state.module = 'goodsin'; state.view = 'c5-list';
         state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null };
         render(); loadC5POs(); return;
@@ -3647,7 +3641,6 @@
       const heading = document.querySelector('.dash-heading');
       if (heading) heading.innerHTML =
         '<span class="dash-heading-title">Pending actions</span>' +
-        '<button class="btn btn-ghost" data-action="open-module" data-mod="goodsin" style="padding:6px 12px;font-size:.78rem;color:#0d9488;border-color:#0d9488;">&#8628; Goods In</button>' +
         '<button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>';
       loadDashboard();
     } else {
@@ -3821,7 +3814,7 @@
     return `<div class="dash-section">
       <div class="dash-section-head" data-action="dash-module-toggle" data-module="m4">
         <div class="dash-stripe" style="background:#7c3aed;"></div>
-        <div class="dash-section-title">05 &nbsp;Stock Checker</div>
+        <div class="dash-section-title">04 &nbsp;Stock Checker</div>
         <span class="dash-count" style="background:#ede9fe;color:#7c3aed;">${stockCounted} of ${stockTotal} counted</span>
         <span class="dash-module-chevron${state.dashModuleExpanded.m4 ? ' open' : ''}" data-module="m4">&#9658;</span>
       </div>
@@ -4080,11 +4073,16 @@
       </div>`;
     }
 
-    /* ── M5: Goods In exceptions ── */
-    let m5Html = '';
+    /* ── M5: Goods In — always visible row + expandable exceptions ── */
     const m5 = state.dash.m5 || [];
-    if (m5.length) {
-      const m5Rows = m5.map(line => {
+    const m5Count = m5.length;
+    const m5Badge = m5Count
+      ? `<span class="dash-count" style="background:#ccfbf1;color:#0f766e;">${m5Count} exception${m5Count !== 1 ? 's' : ''}</span>`
+      : `<span class="dash-count" style="background:#d1fae5;color:#059669;">&#10003; Clear</span>`;
+
+    let m5ExceptionRows = '';
+    if (m5Count) {
+      m5ExceptionRows = m5.map(line => {
         const po = line.goods_in_pos || {};
         const flags = [];
         if (line.has_partial) flags.push(`<span class="gi-flag partial">Short ${line.ordered_qty - line.received_qty} of ${line.ordered_qty}</span>`);
@@ -4099,18 +4097,19 @@
             <button class="btn btn-ghost" data-action="gi-resolve-line" data-id="${esc(line.id)}" style="padding:4px 10px;font-size:.75rem;flex-shrink:0;">Resolve</button>
           </div>`;
       }).join('');
-      m5Html = `<div class="dash-section">
-        <div class="dash-section-head" data-action="dash-module-toggle" data-module="m5">
-          <div class="dash-stripe" style="background:#0d9488;"></div>
-          <div class="dash-section-title">04 &nbsp;Goods In exceptions</div>
-          <span class="dash-count" style="background:#ccfbf1;color:#0f766e;">${m5.length} item${m5.length !== 1 ? 's' : ''}</span>
-          <span class="dash-module-chevron${state.dashModuleExpanded.m5 ? ' open' : ''}" data-module="m5">&#9658;</span>
-        </div>
-        <div class="dash-module-body${state.dashModuleExpanded.m5 ? ' open' : ''}" data-module="m5">
-          ${m5Rows}
-        </div>
-      </div>`;
     }
+
+    const m5Html = `<div class="dash-section">
+      <div class="dash-section-head" data-action="dash-module-toggle" data-module="m5" style="cursor:pointer;">
+        <div class="dash-stripe" style="background:#0d9488;"></div>
+        <div class="dash-section-title" style="flex:1;">05 &nbsp;Goods In</div>
+        ${m5Badge}
+        <button class="btn btn-ghost" data-action="open-module" data-mod="goodsin"
+          style="padding:3px 10px;font-size:.75rem;color:#0d9488;border-color:#0d9488;margin-left:6px;flex-shrink:0;">Open &#8594;</button>
+        ${m5Count ? `<span class="dash-module-chevron${state.dashModuleExpanded.m5 ? ' open' : ''}" data-module="m5">&#9658;</span>` : ''}
+      </div>
+      ${m5Count ? `<div class="dash-module-body${state.dashModuleExpanded.m5 ? ' open' : ''}" data-module="m5">${m5ExceptionRows}</div>` : ''}
+    </div>`;
 
     return altHtml + m1Html + m2Html + m3Html + m5Html + stockHtml;
   }
