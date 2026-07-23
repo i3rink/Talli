@@ -1,4 +1,4 @@
-<!-- Talli v2.9.1 - deployed 23 Jul 2026 -->
+<!-- Talli v2.9.2 - deployed 23 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -612,7 +612,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
   };
-  const VERSION = 'v2.9.1';
+  const VERSION = 'v2.9.2';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -4767,7 +4767,10 @@
     }).join('');
 
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="c5-back-list">&#8592; Back to POs</button></div>
+      <div class="mod-back" style="display:flex;justify-content:space-between;align-items:center;">
+        <button class="btn btn-ghost" data-action="c5-back-list">&#8592; Back to POs</button>
+        <button class="btn btn-ghost" data-action="c5-discard-po" style="color:var(--red);border-color:var(--red);font-size:.8rem;">&#128465; Discard this PO</button>
+      </div>
       <div class="card">
         <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">
           <div class="card-title" style="margin:0;">PO ${esc(po.poNumber)}</div>
@@ -4864,6 +4867,13 @@
   function bindC5Events(action, btn, e) {
     if (action === 'gi-file-pick') return; /* handled by change listener below */
 
+    if (action === 'c5-discard-po') {
+      if (!confirm('Discard this PO? Nothing will be saved.')) return true;
+      state.view = 'c5-list';
+      state.c5.po = null; state.c5.lines = []; state.c5.receipts = {};
+      state.c5.uploadError = null;
+      render(); loadC5POs(); return true;
+    }
     if (action === 'c5-back-list') {
       state.view = 'c5-list';
       state.c5.po = null; state.c5.lines = []; state.c5.receipts = {};
