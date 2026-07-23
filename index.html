@@ -666,7 +666,7 @@
     /* module 4 - stock checker */
     c4: { screen: 'overview', subCat: null },
     /* module 5 - goods in */
-    c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null },
+    c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null, uploadError: null },
     /* home dashboard */
     dash: { loading: true, m1: [], m2: [], m3: [], m5: [] },
     dashUnlocked: false,
@@ -2393,7 +2393,7 @@
       if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadWallPanels(), loadC4EOLItems()]).then(render); }
       if (mod === 'goodsin')    {
         state.module = 'goodsin'; state.view = 'c5-list';
-        state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null };
+        state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null, uploadError: null };
         render(); loadC5POs(); return;
       }
       render(); return;
@@ -2647,7 +2647,7 @@
       state.alternatives = {};
       state.driveFileDocs = [];
       state.appendTarget = null;
-      state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null };
+      state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null, uploadError: null };
       state.dash = { loading: true, m1: [], m2: [], m3: [], m5: [] };
       render(); return;
     }
@@ -4659,7 +4659,7 @@
       const lineCount = (p.goods_in_lines || []).length;
       const exCount   = (p.goods_in_lines || []).filter(l => !l.resolved && (l.has_partial || l.has_damage)).length;
       return `
-        <div class="gi-po-card" data-action="c5-open-po" data-id="${esc(p.id)}">
+        <div class="gi-po-card">
           <div class="gi-po-num">PO ${esc(p.po_number)}</div>
           <div class="gi-po-meta">
             <div class="gi-po-supplier">${esc(p.supplier || 'Unknown supplier')}</div>
@@ -4668,6 +4668,9 @@
           ${open
             ? `<span class="gi-po-badge open">Awaiting</span>`
             : `<span class="gi-po-badge complete">${exCount > 0 ? exCount + ' exception' + (exCount > 1 ? 's' : '') : '&#10003; Done'}</span>`}
+          <button class="btn btn-ghost" data-action="gi-delete-po" data-id="${esc(p.id)}" data-ref="${esc(p.po_number)}"
+            style="padding:3px 8px;font-size:.72rem;color:var(--red);border-color:var(--red);margin-left:6px;flex-shrink:0;"
+            title="Delete this PO">&#128465;</button>
         </div>`;
     };
 
@@ -4676,6 +4679,10 @@
       <div class="card">
         <div class="card-title">Goods In</div>
         <p class="text-muted text-sm" style="margin-bottom:14px;">Upload a PO PDF to start receiving a delivery.</p>
+        ${state.c5.uploadError ? `
+          <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.83rem;color:#b91c1c;line-height:1.5;">
+            &#9888; ${esc(state.c5.uploadError)}
+          </div>` : ''}
         <label class="btn btn-primary" style="display:block;text-align:center;cursor:pointer;">
           &#8593; Upload PO PDF
           <input type="file" id="gi-file-input" accept="application/pdf" style="display:none;" data-action="gi-file-pick" />
@@ -4834,7 +4841,25 @@
     if (action === 'c5-back-list') {
       state.view = 'c5-list';
       state.c5.po = null; state.c5.lines = []; state.c5.receipts = {};
+      state.c5.uploadError = null;
       render(); loadC5POs(); return true;
+    }
+    if (action === 'gi-delete-po') {
+      e.stopPropagation();
+      const id  = btn.dataset.id;
+      const ref = btn.dataset.ref;
+      const pin = prompt(`Enter admin PIN to delete ${ref}:`);
+      if (!pin) return true;
+      if (String(pin).trim() !== String(DASH_PIN)) { toast('Incorrect PIN — deletion cancelled'); return true; }
+      (async () => {
+        /* Delete lines first (FK constraint), then header */
+        await sb.from('goods_in_lines').delete().eq('po_id', id);
+        const { error } = await sb.from('goods_in_pos').delete().eq('id', id);
+        if (error) { toast('Delete failed — check connection'); return; }
+        toast(`${ref} deleted`);
+        loadC5POs();
+      })();
+      return true;
     }
     if (action === 'c5-open-po') {
       /* view-only for completed POs — future detail view can go here */
@@ -4876,11 +4901,21 @@
       state.view = 'c5-upload'; render();
       try {
         const text = await extractPdfText(file);
-        const po   = parsePurchaseOrder(text, file.name);
-        if (!po.items.length) {
-          toast('No line items found in PDF — check the file');
-          state.view = 'c5-list'; render(); return;
+        /* Reject invoices — must be a Purchase Order */
+        const isPO      = /PURCHASE\s+ORDER/i.test(text);
+        const isInvoice = /\bINVOICE\b/i.test(text);
+        if (isInvoice && !isPO) {
+          state.view = 'c5-list';
+          state.c5.uploadError = "That looks like an invoice, not a purchase order. Please check the file and re-upload the correct PO PDF.";
+          render(); return;
         }
+        const po = parsePurchaseOrder(text, file.name);
+        if (!po.items.length) {
+          state.view = 'c5-list';
+          state.c5.uploadError = 'No line items found in that PDF. Please check the file and try again.';
+          render(); return;
+        }
+        state.c5.uploadError = null;
         state.c5.po    = po;
         state.c5.lines = po.items;
         state.c5.receipts = {};
@@ -4888,8 +4923,9 @@
         render();
       } catch (err) {
         console.error('GI parse error:', err);
-        toast('Could not read PDF');
-        state.view = 'c5-list'; render();
+        state.view = 'c5-list';
+        state.c5.uploadError = 'Could not read that PDF. Please try again.';
+        render();
       }
     });
   }
