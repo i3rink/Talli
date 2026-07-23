@@ -1,4 +1,4 @@
-<!-- Talli v2.8.15 - deployed 13 Jul 2026 -->
+<!-- Talli v2.9.0 - deployed 23 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -281,12 +281,48 @@
     .lp-card.c-green  { border-top-color: #059669; }
     .lp-card.c-orange { border-top-color: #ea580c; }
     .lp-card.c-purple { border-top-color: #7c3aed; opacity: .85; }
+    .lp-card.c-teal   { border-top-color: #0d9488; }
 
     .lp-num { font-family: 'Bricolage Grotesque', sans-serif; font-size: .72rem; font-weight: 700; letter-spacing: .1em; }
     .lp-card.c-blue   .lp-num { color: #0075ab; }
     .lp-card.c-green  .lp-num { color: #059669; }
     .lp-card.c-orange .lp-num { color: #ea580c; }
     .lp-card.c-purple .lp-num { color: #7c3aed; }
+    .lp-card.c-teal   .lp-num { color: #0d9488; }
+
+    /* ── Module 5 - Goods In ── */
+    .gi-po-card { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; background: var(--bg); transition: box-shadow .15s; margin-bottom: 8px; }
+    .gi-po-card:hover { box-shadow: var(--shadow); }
+    .gi-po-num  { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.1rem; font-weight: 700; color: #0d9488; flex-shrink: 0; }
+    .gi-po-meta { flex: 1; min-width: 0; }
+    .gi-po-supplier { font-weight: 600; font-size: .9rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .gi-po-date { font-size: .75rem; color: var(--muted); margin-top: 2px; }
+    .gi-po-badge { font-size: .7rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; flex-shrink: 0; }
+    .gi-po-badge.open     { background: #ccfbf1; color: #0f766e; }
+    .gi-po-badge.complete { background: #d1fae5; color: #059669; }
+    .gi-line { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; background: var(--bg); }
+    .gi-line-name { font-weight: 600; font-size: .88rem; margin-bottom: 2px; }
+    .gi-line-sku  { font-family: monospace; font-size: .75rem; color: var(--muted); }
+    .gi-line-ordered { font-size: .8rem; color: var(--muted); margin: 6px 0 10px; }
+    .gi-btn-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+    .gi-status-btn { flex: 1; min-width: 80px; padding: 8px 6px; border-radius: 8px; border: 1.5px solid var(--border); background: transparent; font-size: .8rem; font-weight: 600; cursor: pointer; font-family: inherit; transition: background .12s, border-color .12s; }
+    .gi-status-btn.active-ok  { background: #d1fae5; border-color: #6ee7b7; color: #059669; }
+    .gi-status-btn.active-part { background: #fef3c7; border-color: #fcd34d; color: #92400e; }
+    .gi-status-btn.active-dmg  { background: #fee2e2; border-color: #fca5a5; color: #b91c1c; }
+    .gi-sub-fields { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+    .gi-sub-fields label { font-size: .78rem; color: var(--muted); font-weight: 600; }
+    .gi-sub-fields input { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px; font-family: inherit; font-size: .9rem; }
+    .gi-progress { height: 4px; background: var(--border); border-radius: 2px; margin-bottom: 16px; }
+    .gi-progress-fill { height: 100%; background: #0d9488; border-radius: 2px; transition: width .3s; }
+    .gi-name-label { font-size: .8rem; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+    .gi-complete-line { display: flex; align-items: center; gap: 8px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .gi-complete-line:last-child { border-bottom: none; }
+    .gi-complete-icon { font-size: 1rem; flex-shrink: 0; }
+    .gi-complete-detail { flex: 1; font-size: .83rem; }
+    .gi-flag { display: inline-block; font-size: .68rem; font-weight: 700; padding: 2px 7px; border-radius: 20px; margin-left: 6px; }
+    .gi-flag.partial  { background: #fef3c7; color: #92400e; }
+    .gi-flag.damaged  { background: #fee2e2; color: #b91c1c; }
+    .gi-section-label { font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 16px 0 8px; }
 
     .lp-name { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1rem; font-weight: 700; color: var(--text); line-height: 1.2; }
     .lp-desc { font-size: .78rem; color: var(--muted); line-height: 1.4; }
@@ -573,14 +609,16 @@
     completion: { main: '#059669', dark: '#047857', light: '#d1fae5', faint: '#f0fdf4' },
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
+    goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
   };
-  const VERSION = 'v2.8.17';
+  const VERSION = 'v2.9.0';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
     completion: 'Pick Completion · ' + VERSION,
     delivery: 'Driver Delivery · ' + VERSION,
     stock: 'Stock Checker · ' + VERSION,
+    goodsin: 'Goods In · ' + VERSION,
   };
 
   function applyTheme(mod) {
@@ -627,8 +665,10 @@
     c3: { jobRef: '', items: [], delivered: {}, driverName: '', loading: false, session: null, signoff: null },
     /* module 4 - stock checker */
     c4: { screen: 'overview', subCat: null },
+    /* module 5 - goods in */
+    c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null },
     /* home dashboard */
-    dash: { loading: true, m1: [], m2: [], m3: [] },
+    dash: { loading: true, m1: [], m2: [], m3: [], m5: [] },
     dashUnlocked: false,
     /* expanded session keys in dashboard M1 */
     dashExpanded: {},
@@ -689,6 +729,10 @@
     else if (v === 'c4-misc')     root.innerHTML = renderC4Misc();
     else if (v === 'c4-eol')       root.innerHTML = renderC4EOL();
     else if (v === 'c4-showroom')  root.innerHTML = renderC4Showroom();
+    else if (v === 'c5-list')      root.innerHTML = renderC5List();
+    else if (v === 'c5-upload')    root.innerHTML = renderC5Upload();
+    else if (v === 'c5-receive')   root.innerHTML = renderC5Receive();
+    else if (v === 'c5-complete')  root.innerHTML = renderC5Complete();
     else if (v === 'c4-subcats') root.innerHTML = renderC4SubCats();
     else if (v === 'c4-category') {
       root.innerHTML = renderC4Category();
@@ -714,6 +758,7 @@
       check:`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>`,
       truck:`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg>`,
       pkg:  `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z"/><path d="M12 22V12"/><path d="m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7"/><path d="m7.5 4.27 9 5.15"/></svg>`,
+      inbox:`<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>`,
     };
     return `
       <canvas id="snake-canvas" style="position:fixed;inset:0;pointer-events:none;z-index:-1;"></canvas>
@@ -750,7 +795,9 @@
       <div class="dash-wrap">
         <div class="dash-heading">
           <span class="dash-heading-title">Pending actions</span>
-          ${state.dashUnlocked ? `<button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>` : ''}
+          ${state.dashUnlocked ? `
+            <button class="btn btn-ghost" data-action="open-module" data-mod="goodsin" style="padding:6px 12px;font-size:.78rem;color:#0d9488;border-color:#0d9488;">&#8628; Goods In</button>
+            <button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>` : ''}
         </div>
         <div id="dashboard">${state.dashUnlocked ? '<div class="dash-loading">Loading&#8230;</div>' : renderDashLock()}</div>
       </div>`;
@@ -1524,7 +1571,6 @@
     { key: 'eol',         name: 'End of Line',   icon: '&#9735;', special: 'eol' },
     { key: 'misc',        name: 'Miscellaneous', icon: '&#9749;', special: 'misc' },
     { key: 'showroom',    name: 'Showroom Bays',  icon: '&#9734;', special: 'showroom' },
-    { key: 'goods_in',    name: 'Goods In',       icon: '&#9744;', special: 'goods_in' },
   ];
 
   async function loadC4Counts() {
@@ -1565,14 +1611,6 @@
         <div class="c4-cat-icon" style="opacity:1;color:#fff;">${c.icon}</div>
         <div class="c4-cat-name" style="color:#164044;">${esc(c.name)}</div>
         <div class="c4-cat-count" style="background:rgba(74,159,165,.15);color:#164044;">${n} bay${n === 1 ? '' : 's'} recorded</div>
-      </div>`;
-      }
-      if (c.special === 'goods_in') {
-        return `
-      <div class="c4-cat" style="cursor:default;opacity:.75;position:relative;background:linear-gradient(180deg,#2a9d8f 0%,#ffffff 100%);">
-        <div class="c4-cat-icon" style="opacity:1;color:#fff;">${c.icon}</div>
-        <div class="c4-cat-name" style="color:#0d3d38;">${esc(c.name)}</div>
-        <div class="c4-cat-count" style="background:rgba(42,157,143,.15);color:#0d3d38;">Coming soon</div>
       </div>`;
       }
       const n = counts[c.key] || 0;
@@ -2334,6 +2372,8 @@
         handleFiles([...e.dataTransfer.files].filter(f => f.type === 'application/pdf'));
       });
     }
+    /* Goods In file input */
+    attachGIFileListener();
   }
 
   /* ═══════════════════════════════════════════════
@@ -2353,6 +2393,15 @@
       if (mod === 'completion') { state.view = 'c2-home'; }
       if (mod === 'delivery')   { state.view = 'c3-home'; }
       if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadWallPanels(), loadC4EOLItems()]).then(render); }
+      if (mod === 'goodsin')    {
+        /* PIN gate — same check as dashboard unlock */
+        const pin = prompt('Goods In — admin PIN required:');
+        if (!pin) return;
+        if (String(pin).trim() !== String(DASH_PIN)) { toast('Incorrect PIN'); return; }
+        state.module = 'goodsin'; state.view = 'c5-list';
+        state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null };
+        render(); loadC5POs(); return;
+      }
       render(); return;
     }
     /* ── upload-cancel: clears staging/append state, returns home without wiping M2/M3 ── */
@@ -2604,10 +2653,21 @@
       state.alternatives = {};
       state.driveFileDocs = [];
       state.appendTarget = null;
+      state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null };
+      state.dash = { loading: true, m1: [], m2: [], m3: [], m5: [] };
       render(); return;
     }
 
     if (action === 'dash-refresh')  { loadDashboard(); return; }
+
+    if (action === 'gi-resolve-line') {
+      const id = btn.dataset.id;
+      if (!confirm('Mark this Goods In exception as resolved?')) return;
+      const { error } = await sb.from('goods_in_lines').update({ resolved: true }).eq('id', id);
+      if (error) { toast('Save failed'); return; }
+      toast('Marked resolved');
+      loadDashboard(); return;
+    }
     if (action === 'copy-dash-m1') { copyDashM1(); return; }
     if (action === 'copy-dash-m2') { copyDashM2(); return; }
     if (action === 'copy-dash-m3') { copyDashM3(); return; }
@@ -2933,6 +2993,9 @@
       state.c3 = { jobRef: '', items: [], delivered: {}, driverName: state.c3.driverName, loading: false, session: null, signoff: null };
       state.view = 'c3-home'; render(); return;
     }
+
+    /* ── Module 5 - Goods In ── */
+    if (bindC5Events(action, btn, e)) return;
   });
 
   /* ═══════════════════════════════════════════════
@@ -2986,6 +3049,15 @@
         const s = dashEl.querySelector('[data-action="stock-oos-search"]');
         if (s) { s.focus(); s.setSelectionRange(s.value.length, s.value.length); }
       }
+    }
+    if (e.target.dataset.action === 'gi-qty-input') {
+      const idx   = Number(e.target.dataset.idx);
+      const field = e.target.dataset.field;
+      if (!state.c5.receipts[idx]) state.c5.receipts[idx] = {};
+      state.c5.receipts[idx][field] = e.target.value;
+    }
+    if (e.target.dataset.action === 'gi-name-input') {
+      state.c5.receiverName = e.target.value;
     }
   });
 
@@ -3575,6 +3647,7 @@
       const heading = document.querySelector('.dash-heading');
       if (heading) heading.innerHTML =
         '<span class="dash-heading-title">Pending actions</span>' +
+        '<button class="btn btn-ghost" data-action="open-module" data-mod="goodsin" style="padding:6px 12px;font-size:.78rem;color:#0d9488;border-color:#0d9488;">&#8628; Goods In</button>' +
         '<button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>';
       loadDashboard();
     } else {
@@ -3645,9 +3718,17 @@
         Number(i.current_qty) <= Number(i.low_stock_qty));
       const stockBackorder = stock.filter(i => !!i.backorder_until);
 
+      /* ── Goods In exceptions (partials + damaged) ── */
+      const { data: giExceptions } = await sb.from('goods_in_lines')
+        .select('*, goods_in_pos(po_number, supplier, po_date)')
+        .or('has_partial.eq.true,has_damage.eq.true')
+        .eq('resolved', false)
+        .order('created_at', { ascending: false }).limit(100);
+
       state.dash = {
         loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()], alts: alts || [],
         stockTotal: stock.length, stockCounted, stockLow, stockBackorder, stockAll: stock,
+        m5: giExceptions || [],
       };
       el.innerHTML = renderDashboardContent();
     } catch (err) {
@@ -3740,7 +3821,7 @@
     return `<div class="dash-section">
       <div class="dash-section-head" data-action="dash-module-toggle" data-module="m4">
         <div class="dash-stripe" style="background:#7c3aed;"></div>
-        <div class="dash-section-title">Stock Checker</div>
+        <div class="dash-section-title">05 &nbsp;Stock Checker</div>
         <span class="dash-count" style="background:#ede9fe;color:#7c3aed;">${stockCounted} of ${stockTotal} counted</span>
         <span class="dash-module-chevron${state.dashModuleExpanded.m4 ? ' open' : ''}" data-module="m4">&#9658;</span>
       </div>
@@ -3999,7 +4080,39 @@
       </div>`;
     }
 
-    return altHtml + m1Html + m2Html + m3Html + stockHtml;
+    /* ── M5: Goods In exceptions ── */
+    let m5Html = '';
+    const m5 = state.dash.m5 || [];
+    if (m5.length) {
+      const m5Rows = m5.map(line => {
+        const po = line.goods_in_pos || {};
+        const flags = [];
+        if (line.has_partial) flags.push(`<span class="gi-flag partial">Short ${line.ordered_qty - line.received_qty} of ${line.ordered_qty}</span>`);
+        if (line.has_damage)  flags.push(`<span class="gi-flag damaged">${line.damaged_qty} damaged</span>`);
+        return `
+          <div class="dash-item" style="flex-wrap:wrap;align-items:flex-start;">
+            <div style="flex:1;min-width:0;">
+              <div class="dash-item-name" style="white-space:normal;">${esc(line.product_name)}${line.sku ? `<span class="dash-item-detail" style="margin-left:6px;">${esc(line.sku)}</span>` : ''}</div>
+              <div style="font-size:.75rem;color:var(--muted);margin-top:2px;">PO ${esc(po.po_number || '')} &middot; ${esc(po.supplier || '')} &middot; ${po.po_date ? new Date(po.po_date).toLocaleDateString('en-GB') : ''}</div>
+              <div style="margin-top:4px;">${flags.join('')}</div>
+            </div>
+            <button class="btn btn-ghost" data-action="gi-resolve-line" data-id="${esc(line.id)}" style="padding:4px 10px;font-size:.75rem;flex-shrink:0;">Resolve</button>
+          </div>`;
+      }).join('');
+      m5Html = `<div class="dash-section">
+        <div class="dash-section-head" data-action="dash-module-toggle" data-module="m5">
+          <div class="dash-stripe" style="background:#0d9488;"></div>
+          <div class="dash-section-title">04 &nbsp;Goods In exceptions</div>
+          <span class="dash-count" style="background:#ccfbf1;color:#0f766e;">${m5.length} item${m5.length !== 1 ? 's' : ''}</span>
+          <span class="dash-module-chevron${state.dashModuleExpanded.m5 ? ' open' : ''}" data-module="m5">&#9658;</span>
+        </div>
+        <div class="dash-module-body${state.dashModuleExpanded.m5 ? ' open' : ''}" data-module="m5">
+          ${m5Rows}
+        </div>
+      </div>`;
+    }
+
+    return altHtml + m1Html + m2Html + m3Html + m5Html + stockHtml;
   }
 
   /* ── Dashboard copy functions ── */
@@ -4416,6 +4529,354 @@
       }),
     ];
     navigator.clipboard.writeText(lines.join('\n')).then(() => toast('Report copied to clipboard!'));
+  }
+
+  /* ═══════════════════════════════════════════════
+     MODULE 5 — GOODS IN
+  ═══════════════════════════════════════════════ */
+
+  /* ── PO PDF parser — same engine as M1 packing slips ── */
+  function parsePurchaseOrder(text, filename) {
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+    /* PO number: "P.O. # 201" or "P.O.# 201" */
+    const poMatch   = text.match(/P\.?\s*O\.?\s*#\s*(\S+)/i);
+    const poNumber  = poMatch ? poMatch[1].trim() : filename.replace(/\.pdf$/i, '');
+    /* Date: "Date 18 Jul 2026" */
+    const dateMatch = text.match(/Date\s+(\d{1,2}\s+\w+\s+\d{4})/i);
+    const poDate    = dateMatch ? dateMatch[1].trim() : '';
+    /* Vendor: line after "Vendor To:" */
+    let supplier = '';
+    const vendorIdx = lines.findIndex(l => /vendor\s+to/i.test(l));
+    if (vendorIdx >= 0 && lines[vendorIdx + 1]) supplier = lines[vendorIdx + 1].trim();
+
+    const items = [];
+    let i = 0;
+    while (i < lines.length) {
+      const line = lines[i];
+      const m = line.match(ITEM_RE) || line.match(ITEM_RE2);
+      if (m) {
+        const name = m[2].trim();
+        const qty  = parseFloat(m[3]);
+        const unit = normaliseUnit(m[4] || '');
+        let j = i + 1, sku = '';
+        if (j < lines.length && SKU_RE.test(lines[j]) && !/^\d+\.\s/.test(lines[j])) {
+          sku = lines[j].toUpperCase(); j++;
+        }
+        items.push({ name, sku, qty, unit });
+        i = j; continue;
+      }
+      i++;
+    }
+    return { poNumber, supplier, poDate, items };
+  }
+
+  /* ── Supabase: load PO list ── */
+  async function loadC5POs() {
+    state.c5.loading = true;
+    render();
+    const { data, error } = await sb.from('goods_in_pos')
+      .select('*, goods_in_lines(id, resolved, has_partial, has_damage)')
+      .order('created_at', { ascending: false }).limit(50);
+    state.c5.loading = false;
+    if (error) { toast('Could not load POs'); state.c5.pos = []; }
+    else state.c5.pos = data || [];
+    render();
+  }
+
+  /* ── Supabase: save PO and lines after receipt ── */
+  async function saveGoodsInReceipt() {
+    const { po, lines, receipts, receiverName } = state.c5;
+    if (!po) return;
+    if (!receiverName.trim()) { toast('Enter your name first'); return; }
+
+    /* Upsert the PO header */
+    const { data: poRow, error: poErr } = await sb.from('goods_in_pos').upsert({
+      po_number: po.poNumber,
+      supplier:  po.supplier,
+      po_date:   po.poDate || null,
+      received_by: receiverName.trim(),
+      received_at: new Date().toISOString(),
+      status: 'complete',
+    }, { onConflict: 'po_number' }).select().single();
+    if (poErr) { toast('Save failed — check connection'); console.error(poErr); return; }
+
+    /* Insert lines */
+    const lineRows = lines.map((line, idx) => {
+      const r = receipts[idx] || {};
+      const status     = r.status || 'ok';
+      const receivedQty = status === 'ok' ? line.qty : (Number(r.receivedQty) || 0);
+      const damagedQty  = status === 'damaged' || status === 'partial_damaged'
+        ? (Number(r.damagedQty) || 0) : 0;
+      const hasPartial  = receivedQty < line.qty;
+      const hasDamage   = damagedQty > 0;
+      return {
+        po_id:        poRow.id,
+        product_name: line.name,
+        sku:          line.sku || null,
+        ordered_qty:  line.qty,
+        received_qty: receivedQty,
+        damaged_qty:  damagedQty,
+        has_partial:  hasPartial,
+        has_damage:   hasDamage,
+        resolved:     false,
+      };
+    });
+
+    const { error: lineErr } = await sb.from('goods_in_lines').insert(lineRows);
+    if (lineErr) { toast('Lines save failed'); console.error(lineErr); return; }
+
+    toast('Goods In recorded');
+    state.c5.view = 'complete';
+    state.c5.savedPo = po;
+    state.view = 'c5-complete';
+    render();
+  }
+
+  /* ── RENDER: PO list ── */
+  function renderC5List() {
+    const pos = state.c5.pos || [];
+    const loading = state.c5.loading;
+
+    const openPos = pos.filter(p => p.status !== 'complete');
+    const donePos = pos.filter(p => p.status === 'complete');
+
+    const renderPoCard = (p, open) => {
+      const lineCount = (p.goods_in_lines || []).length;
+      const exCount   = (p.goods_in_lines || []).filter(l => !l.resolved && (l.has_partial || l.has_damage)).length;
+      return `
+        <div class="gi-po-card" data-action="c5-open-po" data-id="${esc(p.id)}">
+          <div class="gi-po-num">PO ${esc(p.po_number)}</div>
+          <div class="gi-po-meta">
+            <div class="gi-po-supplier">${esc(p.supplier || 'Unknown supplier')}</div>
+            <div class="gi-po-date">${p.po_date ? new Date(p.po_date).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : 'Date not recorded'}</div>
+          </div>
+          ${open
+            ? `<span class="gi-po-badge open">Awaiting</span>`
+            : `<span class="gi-po-badge complete">${exCount > 0 ? exCount + ' exception' + (exCount > 1 ? 's' : '') : '&#10003; Done'}</span>`}
+        </div>`;
+    };
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="card">
+        <div class="card-title">Goods In</div>
+        <p class="text-muted text-sm" style="margin-bottom:14px;">Upload a PO PDF to start receiving a delivery.</p>
+        <label class="btn btn-primary" style="display:block;text-align:center;cursor:pointer;">
+          &#8593; Upload PO PDF
+          <input type="file" id="gi-file-input" accept="application/pdf" style="display:none;" data-action="gi-file-pick" />
+        </label>
+      </div>
+      ${loading ? '<div class="dash-loading">Loading&hellip;</div>' : ''}
+      ${!loading && openPos.length ? `
+        <div class="gi-section-label">Open POs</div>
+        ${openPos.map(p => renderPoCard(p, true)).join('')}` : ''}
+      ${!loading && donePos.length ? `
+        <div class="gi-section-label">Completed</div>
+        ${donePos.map(p => renderPoCard(p, false)).join('')}` : ''}
+      ${!loading && !pos.length ? `<div class="text-muted text-sm" style="text-align:center;padding:24px 0;">No POs recorded yet.</div>` : ''}`;
+  }
+
+  /* ── RENDER: upload / parse screen ── */
+  function renderC5Upload() {
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c5-back-list">&#8592; Back</button></div>
+      <div class="card">
+        <div class="card-title">Parsing PO&hellip;</div>
+        <div class="progress-bar" style="margin-top:12px;"><div class="progress-fill" id="gi-progress-fill" style="width:0%;"></div></div>
+        <p class="text-muted text-sm" id="gi-progress-label" style="margin-top:8px;">Reading PDF&hellip;</p>
+      </div>`;
+  }
+
+  /* ── RENDER: receive lines ── */
+  function renderC5Receive() {
+    const { po, lines, receipts, receiverName } = state.c5;
+    if (!po) return renderC5List();
+
+    const total = lines.length;
+    const done  = lines.filter((_, i) => receipts[i] && receipts[i].status).length;
+    const pct   = total ? Math.round((done / total) * 100) : 0;
+
+    const lineCards = lines.map((line, idx) => {
+      const r = receipts[idx] || {};
+      const st = r.status || '';
+      const needsReceived = st === 'partial' || st === 'partial_damaged';
+      const needsDamaged  = st === 'damaged' || st === 'partial_damaged';
+
+      return `
+        <div class="gi-line ${st ? 'gi-line-done' : ''}">
+          <div class="gi-line-name">${esc(line.name)}</div>
+          ${line.sku ? `<div class="gi-line-sku">${esc(line.sku)}</div>` : ''}
+          <div class="gi-line-ordered">Ordered: ${line.qty}${line.unit && line.unit !== 'pcs' ? ' ' + line.unit : ''}</div>
+          <div class="gi-btn-row">
+            <button class="gi-status-btn ${st === 'ok' ? 'active-ok' : ''}"
+              data-action="gi-set-status" data-idx="${idx}" data-status="ok">&#10003; All received</button>
+            <button class="gi-status-btn ${st === 'partial' ? 'active-part' : ''}"
+              data-action="gi-set-status" data-idx="${idx}" data-status="partial">Partial</button>
+            <button class="gi-status-btn ${st === 'damaged' ? 'active-dmg' : ''}"
+              data-action="gi-set-status" data-idx="${idx}" data-status="damaged">Damaged</button>
+            <button class="gi-status-btn ${st === 'partial_damaged' ? 'active-dmg' : ''}"
+              data-action="gi-set-status" data-idx="${idx}" data-status="partial_damaged">Both</button>
+          </div>
+          ${needsReceived || needsDamaged ? `<div class="gi-sub-fields">
+            ${needsReceived ? `<div>
+              <label>How many actually arrived?</label>
+              <input type="number" min="0" max="${line.qty}" value="${r.receivedQty || ''}"
+                placeholder="e.g. 12" data-action="gi-qty-input" data-idx="${idx}" data-field="receivedQty" />
+            </div>` : ''}
+            ${needsDamaged ? `<div>
+              <label>How many are damaged?</label>
+              <input type="number" min="0" max="${line.qty}" value="${r.damagedQty || ''}"
+                placeholder="e.g. 3" data-action="gi-qty-input" data-idx="${idx}" data-field="damagedQty" />
+            </div>` : ''}
+          </div>` : ''}
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c5-back-list">&#8592; Back to POs</button></div>
+      <div class="card">
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;">
+          <div class="card-title" style="margin:0;">PO ${esc(po.poNumber)}</div>
+          <div class="text-muted text-sm">${esc(po.supplier)}</div>
+        </div>
+        ${po.poDate ? `<div class="text-muted text-sm" style="margin-bottom:10px;">${esc(po.poDate)}</div>` : ''}
+        <div class="gi-progress"><div class="gi-progress-fill" style="width:${pct}%;"></div></div>
+        <div style="font-size:.78rem;color:var(--muted);margin-bottom:14px;">${done} of ${total} lines checked</div>
+        <div class="gi-name-label">Your name</div>
+        <input class="text-input" type="text" placeholder="e.g. Reiss"
+          value="${esc(receiverName)}" data-action="gi-name-input"
+          style="margin-bottom:16px;" />
+      </div>
+      ${lineCards}
+      ${done === total ? `
+        <button class="btn btn-primary" data-action="gi-submit" style="width:100%;margin-top:8px;">
+          Submit receipt &#8594;
+        </button>` : `
+        <button class="btn btn-ghost" data-action="gi-submit" style="width:100%;margin-top:8px;opacity:.5;" disabled>
+          Check all lines to submit
+        </button>`}`;
+  }
+
+  /* ── RENDER: completion summary ── */
+  function renderC5Complete() {
+    const { savedPo, lines, receipts } = state.c5;
+    const exceptions = lines.filter((_, i) => {
+      const r = receipts[i] || {};
+      return r.status && r.status !== 'ok';
+    });
+
+    const summaryRows = lines.map((line, idx) => {
+      const r = receipts[idx] || {};
+      const st = r.status || 'ok';
+      let icon = '&#10003;', detail = 'All received';
+      if (st === 'partial') {
+        icon = '&#8776;';
+        detail = `${r.receivedQty || '?'} of ${line.qty} received`;
+      } else if (st === 'damaged') {
+        icon = '&#9888;';
+        detail = `${r.damagedQty || '?'} damaged on arrival`;
+      } else if (st === 'partial_damaged') {
+        icon = '&#9888;';
+        detail = `${r.receivedQty || '?'} received, ${r.damagedQty || '?'} damaged`;
+      }
+      return `
+        <div class="gi-complete-line">
+          <div class="gi-complete-icon" style="color:${st === 'ok' ? 'var(--green)' : '#d97706'}">${icon}</div>
+          <div class="gi-complete-detail">
+            <div>${esc(line.name)}${line.sku ? ` <span class="item-sku">${esc(line.sku)}</span>` : ''}</div>
+            <div style="color:var(--muted);font-size:.75rem;margin-top:1px;">${detail}</div>
+          </div>
+        </div>`;
+    }).join('');
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="card" style="border-top:3px solid #0d9488;">
+        <div class="card-title" style="color:#0d9488;">&#10003; Receipt recorded</div>
+        <div style="font-weight:700;font-size:1rem;margin-bottom:2px;">PO ${esc(savedPo?.poNumber || '')}</div>
+        <div class="text-muted text-sm">${esc(savedPo?.supplier || '')}</div>
+        ${exceptions.length ? `
+          <div style="margin-top:12px;padding:10px 12px;background:#fef3c7;border-radius:8px;font-size:.82rem;color:#92400e;font-weight:600;">
+            &#9888; ${exceptions.length} exception${exceptions.length > 1 ? 's' : ''} flagged to Scott
+          </div>` : `
+          <div style="margin-top:12px;padding:10px 12px;background:#d1fae5;border-radius:8px;font-size:.82rem;color:#059669;font-weight:600;">
+            &#10003; Full delivery — no issues
+          </div>`}
+      </div>
+      <div class="card">
+        <div class="card-title">Summary</div>
+        ${summaryRows}
+      </div>
+      <button class="btn btn-ghost" data-action="c5-back-list" style="width:100%;margin-top:8px;">
+        &#8592; Back to POs
+      </button>`;
+  }
+
+  /* ── Goods In action handlers (added to bindEvents) ── */
+  function bindC5Events(action, btn, e) {
+    if (action === 'gi-file-pick') return; /* handled by change listener below */
+
+    if (action === 'c5-back-list') {
+      state.view = 'c5-list';
+      state.c5.po = null; state.c5.lines = []; state.c5.receipts = {};
+      render(); loadC5POs(); return true;
+    }
+    if (action === 'c5-open-po') {
+      /* view-only for completed POs — future detail view can go here */
+      return true;
+    }
+    if (action === 'gi-set-status') {
+      const idx = Number(btn.dataset.idx);
+      const status = btn.dataset.status;
+      if (!state.c5.receipts[idx]) state.c5.receipts[idx] = {};
+      state.c5.receipts[idx].status = status;
+      render(); return true;
+    }
+    if (action === 'gi-qty-input') {
+      const idx   = Number(btn.dataset.idx);
+      const field = btn.dataset.field;
+      if (!state.c5.receipts[idx]) state.c5.receipts[idx] = {};
+      state.c5.receipts[idx][field] = btn.value;
+      /* no re-render on every keystroke — just update state */
+      return true;
+    }
+    if (action === 'gi-name-input') {
+      state.c5.receiverName = btn.value;
+      return true;
+    }
+    if (action === 'gi-submit') {
+      saveGoodsInReceipt(); return true;
+    }
+    return false;
+  }
+
+  /* ── File input listener for GI PDF upload ── */
+  function attachGIFileListener() {
+    const inp = document.getElementById('gi-file-input');
+    if (!inp || inp._gibound) return;
+    inp._gibound = true;
+    inp.addEventListener('change', async function () {
+      const file = this.files[0];
+      if (!file) return;
+      state.view = 'c5-upload'; render();
+      try {
+        const text = await extractPdfText(file);
+        const po   = parsePurchaseOrder(text, file.name);
+        if (!po.items.length) {
+          toast('No line items found in PDF — check the file');
+          state.view = 'c5-list'; render(); return;
+        }
+        state.c5.po    = po;
+        state.c5.lines = po.items;
+        state.c5.receipts = {};
+        state.view = 'c5-receive';
+        render();
+      } catch (err) {
+        console.error('GI parse error:', err);
+        toast('Could not read PDF');
+        state.view = 'c5-list'; render();
+      }
+    });
   }
 
   /* ═══════════════════════════════════════════════
