@@ -1,4 +1,4 @@
-<!-- Talli v2.9.0 - deployed 23 Jul 2026 -->
+<!-- Talli v2.9.1 - deployed 23 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -612,7 +612,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
   };
-  const VERSION = 'v2.9.0';
+  const VERSION = 'v2.9.1';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -3719,11 +3719,15 @@
       const stockBackorder = stock.filter(i => !!i.backorder_until);
 
       /* ── Goods In exceptions (partials + damaged) ── */
-      const { data: giExceptions } = await sb.from('goods_in_lines')
-        .select('*, goods_in_pos(po_number, supplier, po_date)')
-        .or('has_partial.eq.true,has_damage.eq.true')
-        .eq('resolved', false)
-        .order('created_at', { ascending: false }).limit(100);
+      let giExceptions = [];
+      try {
+        const { data: giData } = await sb.from('goods_in_lines')
+          .select('*, goods_in_pos(po_number, supplier, po_date)')
+          .or('has_partial.eq.true,has_damage.eq.true')
+          .eq('resolved', false)
+          .order('created_at', { ascending: false }).limit(100);
+        giExceptions = giData || [];
+      } catch (_) { /* table not yet created — silently skip */ }
 
       state.dash = {
         loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()], alts: alts || [],
@@ -4600,7 +4604,7 @@
       .select('*, goods_in_lines(id, resolved, has_partial, has_damage)')
       .order('created_at', { ascending: false }).limit(50);
     state.c5.loading = false;
-    if (error) { toast('Could not load POs'); state.c5.pos = []; }
+    if (error) { state.c5.pos = []; }
     else state.c5.pos = data || [];
     render();
   }
@@ -4676,10 +4680,9 @@
           ${open
             ? `<span class="gi-po-badge open">Awaiting</span>`
             : `<span class="gi-po-badge complete">${exCount > 0 ? exCount + ' exception' + (exCount > 1 ? 's' : '') : '&#10003; Done'}</span>`}
-          ${state.dashUnlocked ? `
           <button class="btn btn-ghost" data-action="gi-delete-po" data-id="${esc(p.id)}" data-ref="${esc(p.po_number)}"
             style="padding:3px 8px;font-size:.72rem;color:var(--red);border-color:var(--red);margin-left:6px;flex-shrink:0;"
-            title="Delete this PO">&#128465;</button>` : ''}
+            title="Delete this PO">&#128465;</button>
         </div>`;
     };
 
