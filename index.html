@@ -261,6 +261,7 @@
     .lp-intro h1 { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.4rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
 
     .lp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+    .lp-grid > :nth-child(5) { grid-column: 1 / -1; }
     .lp-card {
       position: relative;
       display: flex; flex-direction: column; gap: 6px;
@@ -666,7 +667,7 @@
     /* module 4 - stock checker */
     c4: { screen: 'overview', subCat: null },
     /* module 5 - goods in */
-    c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null, uploadError: null },
+    c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null },
     /* home dashboard */
     dash: { loading: true, m1: [], m2: [], m3: [], m5: [] },
     dashUnlocked: false,
@@ -790,6 +791,12 @@
           <span class="lp-name">Stock Checker</span>
           <span class="lp-desc">Physical counts by category, variance review, audit trail.</span>
           <span class="lp-glyph" style="color:#7c3aed;">${ic.pkg}</span>
+        </button>
+        <button class="lp-card c-teal" data-action="open-module" data-mod="goodsin">
+          <span class="lp-num">05</span>
+          <span class="lp-name">Goods In</span>
+          <span class="lp-desc">Receive deliveries and collections against purchase orders.</span>
+          <span class="lp-glyph" style="color:#0d9488;">${ic.inbox}</span>
         </button>
       </div>
       <div class="dash-wrap">
@@ -2393,7 +2400,7 @@
       if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadWallPanels(), loadC4EOLItems()]).then(render); }
       if (mod === 'goodsin')    {
         state.module = 'goodsin'; state.view = 'c5-list';
-        state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null, uploadError: null };
+        state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null };
         render(); loadC5POs(); return;
       }
       render(); return;
@@ -2647,7 +2654,7 @@
       state.alternatives = {};
       state.driveFileDocs = [];
       state.appendTarget = null;
-      state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', loading: false, stagedFile: null, uploadError: null };
+      state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null };
       state.dash = { loading: true, m1: [], m2: [], m3: [], m5: [] };
       render(); return;
     }
@@ -4600,18 +4607,19 @@
 
   /* ── Supabase: save PO and lines after receipt ── */
   async function saveGoodsInReceipt() {
-    const { po, lines, receipts, receiverName } = state.c5;
+    const { po, lines, receipts, receiverName, arrivalType } = state.c5;
     if (!po) return;
     if (!receiverName.trim()) { toast('Enter your name first'); return; }
 
     /* Upsert the PO header */
     const { data: poRow, error: poErr } = await sb.from('goods_in_pos').upsert({
-      po_number: po.poNumber,
-      supplier:  po.supplier,
-      po_date:   po.poDate || null,
-      received_by: receiverName.trim(),
-      received_at: new Date().toISOString(),
-      status: 'complete',
+      po_number:    po.poNumber,
+      supplier:     po.supplier,
+      po_date:      po.poDate || null,
+      received_by:  receiverName.trim(),
+      arrival_type: arrivalType || 'delivery',
+      received_at:  new Date().toISOString(),
+      status:       'complete',
     }, { onConflict: 'po_number' }).select().single();
     if (poErr) { toast('Save failed — check connection'); console.error(poErr); return; }
 
@@ -4757,31 +4765,41 @@
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="c5-back-list">&#8592; Back to POs</button></div>
       <div class="card">
-        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:8px;">
+        <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">
           <div class="card-title" style="margin:0;">PO ${esc(po.poNumber)}</div>
           <div class="text-muted text-sm">${esc(po.supplier)}</div>
         </div>
-        ${po.poDate ? `<div class="text-muted text-sm" style="margin-bottom:10px;">${esc(po.poDate)}</div>` : ''}
-        <div class="gi-progress"><div class="gi-progress-fill" style="width:${pct}%;"></div></div>
-        <div style="font-size:.78rem;color:var(--muted);margin-bottom:14px;">${done} of ${total} lines checked</div>
-        <div class="gi-name-label">Your name</div>
-        <input class="text-input" type="text" placeholder="e.g. Reiss"
+        ${po.poDate ? `<div class="text-muted text-sm" style="margin-bottom:12px;">${esc(po.poDate)}</div>` : ''}
+
+        <div class="gi-name-label">How did it arrive?</div>
+        <div class="gi-btn-row" style="margin-bottom:16px;">
+          <button class="gi-status-btn ${state.c5.arrivalType === 'delivery' ? 'active-ok' : ''}"
+            data-action="gi-arrival-type" data-type="delivery">&#128666; Delivery</button>
+          <button class="gi-status-btn ${state.c5.arrivalType === 'collection' ? 'active-ok' : ''}"
+            data-action="gi-arrival-type" data-type="collection">&#128230; Collection</button>
+        </div>
+
+        <div class="gi-name-label">Counted by <span style="color:#b91c1c;">*</span></div>
+        <input class="text-input" type="text" placeholder="Your name e.g. Reiss"
           value="${esc(receiverName)}" data-action="gi-name-input"
           style="margin-bottom:16px;" />
+
+        <div class="gi-progress"><div class="gi-progress-fill" style="width:${pct}%;"></div></div>
+        <div style="font-size:.78rem;color:var(--muted);margin-top:6px;">${done} of ${total} lines checked</div>
       </div>
       ${lineCards}
       ${done === total ? `
         <button class="btn btn-primary" data-action="gi-submit" style="width:100%;margin-top:8px;">
           Submit receipt &#8594;
         </button>` : `
-        <button class="btn btn-ghost" data-action="gi-submit" style="width:100%;margin-top:8px;opacity:.5;" disabled>
+        <button class="btn btn-ghost" style="width:100%;margin-top:8px;opacity:.5;cursor:default;">
           Check all lines to submit
         </button>`}`;
   }
 
   /* ── RENDER: completion summary ── */
   function renderC5Complete() {
-    const { savedPo, lines, receipts } = state.c5;
+    const { savedPo, lines, receipts, receiverName, arrivalType } = state.c5;
     const exceptions = lines.filter((_, i) => {
       const r = receipts[i] || {};
       return r.status && r.status !== 'ok';
@@ -4817,6 +4835,10 @@
         <div class="card-title" style="color:#0d9488;">&#10003; Receipt recorded</div>
         <div style="font-weight:700;font-size:1rem;margin-bottom:2px;">PO ${esc(savedPo?.poNumber || '')}</div>
         <div class="text-muted text-sm">${esc(savedPo?.supplier || '')}</div>
+        <div style="margin-top:10px;font-size:.82rem;color:var(--muted);">
+          ${arrivalType === 'collection' ? '&#128230; Collection' : '&#128666; Delivery'}
+          &nbsp;&middot;&nbsp; Counted by <strong>${esc(receiverName || '—')}</strong>
+        </div>
         ${exceptions.length ? `
           <div style="margin-top:12px;padding:10px 12px;background:#fef3c7;border-radius:8px;font-size:.82rem;color:#92400e;font-weight:600;">
             &#9888; ${exceptions.length} exception${exceptions.length > 1 ? 's' : ''} flagged to Scott
@@ -4864,6 +4886,10 @@
     if (action === 'c5-open-po') {
       /* view-only for completed POs — future detail view can go here */
       return true;
+    }
+    if (action === 'gi-arrival-type') {
+      state.c5.arrivalType = btn.dataset.type;
+      render(); return true;
     }
     if (action === 'gi-set-status') {
       const idx = Number(btn.dataset.idx);
