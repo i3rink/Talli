@@ -4676,9 +4676,10 @@
           ${open
             ? `<span class="gi-po-badge open">Awaiting</span>`
             : `<span class="gi-po-badge complete">${exCount > 0 ? exCount + ' exception' + (exCount > 1 ? 's' : '') : '&#10003; Done'}</span>`}
+          ${state.dashUnlocked ? `
           <button class="btn btn-ghost" data-action="gi-delete-po" data-id="${esc(p.id)}" data-ref="${esc(p.po_number)}"
             style="padding:3px 8px;font-size:.72rem;color:var(--red);border-color:var(--red);margin-left:6px;flex-shrink:0;"
-            title="Delete this PO">&#128465;</button>
+            title="Delete this PO">&#128465;</button>` : ''}
         </div>`;
     };
 
