@@ -1,4 +1,4 @@
-<!-- Talli v2.9.2 - deployed 23 Jul 2026 -->
+<!-- Talli v2.9.3 - deployed 24 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -612,7 +612,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
   };
-  const VERSION = 'v2.9.2';
+  const VERSION = 'v2.9.3';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -4438,6 +4438,12 @@
     const delivered = state.c3.delivered;
     const sessionId = state.c3.session ? state.c3.session.id : null;
     const s         = state.c3.signoff || {};
+
+    /* read free-text fields from DOM — these have no change handler so state won't have them */
+    const postcodeEl = document.getElementById('c3-postcode');
+    const notesEl    = document.getElementById('c3-notes');
+    if (postcodeEl) s.postcode = postcodeEl.value;
+    if (notesEl)    s.notes    = notesEl.value;
 
     /* validate required sign-off fields */
     if (!s.postcode || !s.postcode.trim())    { toast('Enter a customer postcode'); return; }
