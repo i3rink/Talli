@@ -3685,7 +3685,7 @@
             const item = mlMap.get(String(c.item_key)) || {};
             const have = c.status === 'part' ? (Number(c.have_qty) || 0) : 0;
             const needed = Number(item.qty) || 0;
-            return { name: item.name || c.item_key, sku: item.sku || '', needed, have, toOrder: needed - have };
+            return { name: item.name || c.item_key, sku: item.sku || '', needed, have, toOrder: needed - have, jobs: item.jobs || [] };
           }).filter(i => i.toOrder > 0);
           if (items.length) m1.push({ code: sess.code, items });
         });
@@ -3939,12 +3939,16 @@
     if (m1Count) {
       const sessionBlocks = m1.map(({ code, items }) => {
         const isOpen = !!state.dashExpanded[code];
-        const itemRows = items.map(i => `
+        const itemRows = items.map(i => {
+          const jobList = (i.jobs || []).map(j => displayJobRef(normJobRef(j))).filter(Boolean);
+          return `
           <div class="dash-item">
             <div class="dash-item-name">${esc(i.name)}</div>
             ${i.sku ? `<span class="dash-item-detail">${esc(i.sku)}</span>` : ''}
+            ${jobList.length ? `<span class="dash-item-detail" style="color:var(--muted);">Jobs: ${jobList.map(j => esc(j)).join(', ')}</span>` : ''}
             <span class="dash-item-short">Need ${i.toOrder}</span>
-          </div>`).join('');
+          </div>`;
+        }).join('');
         return `
           <div class="dash-session">
             <div class="dash-session-head" data-action="dash-expand" data-key="${esc(code)}">
