@@ -1,4 +1,4 @@
-<!-- Talli v2.9.4 - deployed 24 Jul 2026 -->
+<!-- Talli v2.9.5 - deployed 24 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -612,7 +612,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
   };
-  const VERSION = 'v2.9.4';
+  const VERSION = 'v2.9.5';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -3942,11 +3942,13 @@
         const itemRows = items.map(i => {
           const jobList = (i.jobs || []).map(j => displayJobRef(normJobRef(j))).filter(Boolean);
           return `
-          <div class="dash-item">
-            <div class="dash-item-name">${esc(i.name)}</div>
-            ${i.sku ? `<span class="dash-item-detail">${esc(i.sku)}</span>` : ''}
-            ${jobList.length ? `<div class="c4-loc-pills" style="margin-top:4px;"><span class="c4-loc-label">Jobs</span>${jobList.map(j => `<span class="c4-loc-pill">${esc(j)}</span>`).join('')}</div>` : ''}
-            <span class="dash-item-short">Need ${i.toOrder}</span>
+          <div class="dash-item" style="flex-wrap:wrap;align-items:flex-start;padding:8px 16px;">
+            <div style="flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;">
+              <div class="dash-item-name" style="white-space:normal;">${esc(i.name)}</div>
+              ${i.sku ? `<span class="dash-item-detail" style="white-space:nowrap;">${esc(i.sku)}</span>` : ''}
+            </div>
+            <span class="dash-item-short" style="flex-shrink:0;">Need ${i.toOrder}</span>
+            ${jobList.length ? `<div class="c4-loc-pills" style="width:100%;margin-top:5px;"><span class="c4-loc-label">Jobs</span>${jobList.map(j => `<span class="c4-loc-pill">${esc(j)}</span>`).join('')}</div>` : ''}
           </div>`;
         }).join('');
         return `
