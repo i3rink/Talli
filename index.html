@@ -612,7 +612,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
   };
-  const VERSION = 'v2.9.5';
+  const VERSION = 'v2.9.6';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1190,6 +1190,7 @@
           <div>
             <span class="card-title" style="margin-bottom:0;">Stock Check</span>
             <div class="text-muted text-sm">${state.session.code} &middot; ${done}/${total} checked</div>
+            <div class="text-muted text-sm" style="margin-top:3px;">${(state.session.jobs || []).map(j => j.replace(/^Q/i,'')).join(', ')}</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
             <button class="btn btn-ghost" data-action="go-home">&#8592; Home</button>
