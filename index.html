@@ -1,4 +1,4 @@
-<!-- Talli v2.9.8 - deployed 30 Jul 2026 -->
+<!-- Talli v2.9.9 - deployed 30 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -612,7 +612,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
   };
-  const VERSION = 'v2.9.8';
+  const VERSION = 'v2.9.9';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -3395,19 +3395,32 @@
     const prog = document.getElementById('parse-progress');
     if (prog) prog.style.display = '';
 
+    setProgress(80, 'Fetching current session…');
+
+    /* Always re-fetch the session fresh from the DB so we never merge against
+       a stale in-memory masterList. This prevents a second append from
+       clobbering items written by a previous one. */
+    const { data: freshSession, error: fetchErr } = await sb.from('sessions').select('*').eq('id', target.id).single();
+    if (fetchErr || !freshSession) {
+      toast('Could not fetch session - check your connection');
+      return;
+    }
+    const freshMasterList = freshSession.master_list || [];
+    const freshJobs       = freshSession.jobs || [];
+
     setProgress(85, 'Merging into existing session…');
 
     /* Reconstruct existing items per-job from jobQtys so re-appending a job
        doesn't double-count. Each original job becomes its own job-like object
        with only its own quantities, matching what buildMasterList expects.    */
     const existingJobIds = [...new Set(
-      target.masterList.flatMap(i => Object.keys(i.jobQtys || {}))
+      freshMasterList.flatMap(i => Object.keys(i.jobQtys || {}))
     )];
 
     const existingJobObjs = existingJobIds.length
       ? existingJobIds.map(jobId => ({
           id: jobId,
-          items: target.masterList
+          items: freshMasterList
             .filter(i => i.jobQtys && i.jobQtys[jobId] != null)
             .map(i => ({
               name: i.name ? i.name.trim() : i.name,
@@ -3420,7 +3433,7 @@
       : [{
           /* fallback: no jobQtys stored - treat whole list as one existing block */
           id: '__existing__',
-          items: target.masterList.map(i => ({
+          items: freshMasterList.map(i => ({
             name: i.name ? i.name.trim() : i.name,
             sku:  i.sku  ? i.sku.trim()  : '',
             qty:  i.qty,
@@ -3437,9 +3450,9 @@
     /* Build merged master list */
     const merged = buildMasterList([...baseJobObjs, ...newJobObjs]);
 
-    /* Merge job refs */
+    /* Merge job refs — use freshJobs from DB, not the potentially stale in-memory copy */
     const newJobIds = newJobObjs.map(j => j.id);
-    const mergedJobs = [...new Set([...target.jobs, ...newJobIds])];
+    const mergedJobs = [...new Set([...freshJobs, ...newJobIds])];
 
     /* Update session in Supabase */
     setProgress(95, 'Saving…');
