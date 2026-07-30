@@ -1,4 +1,4 @@
-<!-- Talli v2.9.5 - deployed 24 Jul 2026 -->
+<!-- Talli v2.9.8 - deployed 30 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1395,7 +1395,7 @@
         <div style="display:flex;flex-direction:column;gap:10px;">
           <input id="c3-job" type="text" placeholder="Job number e.g. 1659" autocapitalize="off"
             style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" />
-          <input id="c3-driver" type="text" placeholder="Your name (optional)"
+          <input id="c3-driver" type="text" placeholder="Your name (required)"
             style="width:100%;padding:10px 14px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:.95rem;outline:none;" value="${esc(state.c3.driverName)}" />
           <button class="btn btn-primary" data-action="c3-load" style="width:100%;">Find Job &#8594;</button>
         </div>
@@ -1463,19 +1463,29 @@
       }).join('');
     }
 
-    const photoPreview = s.photoPreview
-      ? `<img src="${esc(s.photoPreview)}" style="width:100%;max-height:220px;object-fit:cover;border-radius:8px;margin-top:6px;" />`
+    const photos = s.photos || [];
+    const photoThumbsHtml = photos.length
+      ? photos.map((p, i) => `<div style="position:relative;display:inline-block;margin:4px;">
+          <img src="${esc(p.preview)}" style="width:90px;height:90px;object-fit:cover;border-radius:6px;border:1.5px solid var(--border);" />
+          <button data-action="c3-photo-remove" data-idx="${i}" style="position:absolute;top:-6px;right:-6px;width:20px;height:20px;border-radius:50%;background:#dc2626;color:#fff;border:none;cursor:pointer;font-size:12px;line-height:1;padding:0;">&#10005;</button>
+        </div>`).join('')
       : '';
 
     const jobLabel    = esc(displayJobRef(state.c3.jobRef));
     const postcodeVal = esc(s.postcode || '');
     const notesVal    = esc(s.notes || '');
     const teamHtml    = radioGroup('c3-team', [['Team 1','Team 1'],['Team 2','Team 2']], s.team || '');
-    const statusHtml  = radioGroup('c3-deliverystatus', [
-      ['all',     'Yes \u2014 all delivered'],
-      ['partial', 'Partial \u2014 some items not delivered'],
-      ['failed',  'No delivery \u2014 delivery failed'],
-    ], s.deliveryStatus || '');
+    const hasShort    = Object.values(state.c3.delivered).some(d => d.status === 'short');
+    /* if any item marked short, force partial and hide full-delivery option */
+    if (hasShort && s.deliveryStatus !== 'partial' && s.deliveryStatus !== 'failed') {
+      if (!state.c3.signoff) state.c3.signoff = {};
+      state.c3.signoff.deliveryStatus = 'partial';
+      s.deliveryStatus = 'partial';
+    }
+    const statusOptions = hasShort
+      ? [['partial', 'Partial \u2014 some items not delivered'], ['failed', 'No delivery \u2014 delivery failed']]
+      : [['all', 'Yes \u2014 all delivered'], ['partial', 'Partial \u2014 some items not delivered'], ['failed', 'No delivery \u2014 delivery failed']];
+    const statusHtml  = radioGroup('c3-deliverystatus', statusOptions, s.deliveryStatus || '');
     const presentHtml = radioGroup('c3-customerpresent', [
       ['yes',       'Yes'],
       ['neighbour', 'No \u2014 left with neighbour'],
@@ -1510,18 +1520,15 @@
         </div>
 
         <div style="${groupStyle}margin-bottom:16px;">
-          <label style="${labelStyle}">Issues / notes</label>
-          <textarea id="c3-notes" rows="3" placeholder="Any issues, damage, access problems..."
+          <label style="${labelStyle}">Issues / notes (required)</label>
+          <textarea id="c3-notes" rows="3" placeholder="e.g. All delivered, no issues / Missing item X"
             style="${inputStyle}resize:vertical;">${notesVal}</textarea>
         </div>
 
         <div style="${groupStyle}margin-bottom:16px;">
-          <label style="${labelStyle}">Photo of materials at site</label>
-          ${photoPreview}
-          <div style="display:flex;gap:8px;">
-            <button class="btn btn-ghost" data-action="c3-photo-pick" style="flex:1;">${photoBtn}</button>
-            ${s.photoPreview ? '<button class="btn btn-ghost" data-action="c3-photo-delete" style="color:#dc2626;">Remove</button>' : ''}
-          </div>
+          <label style="${labelStyle}">Photos of materials at site (required, add as many as needed)</label>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;">${photoThumbsHtml}</div>
+          <button class="btn btn-ghost" data-action="c3-photo-pick" style="width:100%;">&#128247; Add photo</button>
           <input type="file" id="c3-photo-input" accept="image/*" capture="environment" style="display:none;" />
         </div>
 
@@ -2972,14 +2979,14 @@
     }
     if (action === 'c3-photo-pick') {
       const inp = document.getElementById('c3-photo-input');
-      if (inp) inp.click();
+      if (inp) { inp.value = ''; inp.click(); }
       return;
     }
-    if (action === 'c3-photo-delete') {
-      if (!confirm('Remove this photo?')) return;
+    if (action === 'c3-photo-remove') {
+      const idx = parseInt(btn.dataset.idx, 10);
       if (!state.c3.signoff) state.c3.signoff = {};
-      state.c3.signoff.photoFile    = null;
-      state.c3.signoff.photoPreview = null;
+      if (!state.c3.signoff.photos) state.c3.signoff.photos = [];
+      state.c3.signoff.photos.splice(idx, 1);
       render(); initC3SignaturePad(); return;
     }
     if (action === 'c3-sig-clear') {
@@ -3009,10 +3016,10 @@
       const file = e.target.files && e.target.files[0];
       if (!file) return;
       if (!state.c3.signoff) state.c3.signoff = {};
-      state.c3.signoff.photoFile = file;
+      if (!state.c3.signoff.photos) state.c3.signoff.photos = [];
       const reader = new FileReader();
       reader.onload = ev => {
-        state.c3.signoff.photoPreview = ev.target.result;
+        state.c3.signoff.photos.push({ file, preview: ev.target.result });
         render(); initC3SignaturePad();
       };
       reader.readAsDataURL(file);
@@ -4363,9 +4370,11 @@
     if (!jobEl) return;
     const raw = jobEl.value.trim();
     if (!raw) { toast('Enter a job reference'); return; }
+    const driverName = driverEl ? driverEl.value.trim() : '';
+    if (!driverName) { toast('Enter your name before continuing'); return; }
     const jobNum = displayJobRef(raw.replace(/^Q/i, '').trim()) || raw.trim();
     state.c3.jobRef     = jobNum;
-    state.c3.driverName = driverEl ? driverEl.value.trim() : '';
+    state.c3.driverName = driverName;
     state.c3.loading    = true; render();
 
     const { data: allPicks } = await sb.from('pick_completions').select('*')
@@ -4458,6 +4467,8 @@
     if (!s.team)                               { toast('Select a delivery team'); return; }
     if (!s.deliveryStatus)                     { toast('Select delivery status'); return; }
     if (!s.customerPresent)                    { toast('Select customer present option'); return; }
+    if (!s.notes || !s.notes.trim())           { toast('Add a note before submitting'); return; }
+    if (!s.photos || s.photos.length === 0)    { toast('Add at least one photo of the materials on site'); return; }
 
     /* check signature canvas has marks */
     const canvas = document.getElementById('c3-sig-canvas');
@@ -4473,16 +4484,17 @@
 
     toast('Uploading…');
 
-    /* upload photo if present */
-    let photoUrl = null;
-    if (s.photoFile) {
-      const ext  = (s.photoFile.name.split('.').pop() || 'jpg').toLowerCase();
-      const path = 'deliveries/photo-' + state.c3.jobRef + '-' + Date.now() + '.' + ext;
-      const { error: upErr } = await sb.storage.from('showroom-images').upload(path, s.photoFile, { upsert: true });
+    /* upload all photos */
+    const photoUrls = [];
+    for (const p of (s.photos || [])) {
+      const ext  = (p.file.name.split('.').pop() || 'jpg').toLowerCase();
+      const path = 'deliveries/photo-' + state.c3.jobRef + '-' + Date.now() + '-' + photoUrls.length + '.' + ext;
+      const { error: upErr } = await sb.storage.from('showroom-images').upload(path, p.file, { upsert: true });
       if (upErr) { toast('Photo upload failed - check connection'); return; }
       const { data: urlData } = sb.storage.from('showroom-images').getPublicUrl(path);
-      photoUrl = urlData ? urlData.publicUrl : null;
+      if (urlData) photoUrls.push(urlData.publicUrl);
     }
+    const photoUrl = photoUrls.length > 1 ? JSON.stringify(photoUrls) : (photoUrls[0] || null);
 
     /* upload signature */
     if (canvas) {
@@ -4531,6 +4543,25 @@
     };
     const { error: subErr } = await sb.from('delivery_submissions').insert(subRow);
     if (subErr) { console.error(subErr); toast('Delivery saved but sign-off record failed - contact Neil'); }
+
+    /* if partial sign-off, write a remedial row to deliveries so it appears on the dashboard */
+    if (s.deliveryStatus === 'partial') {
+      const noteText = s.notes ? s.notes.trim() : 'Partial delivery - see sign-off notes';
+      const remedialRow = {
+        session_id:        sessionId,
+        job_ref:           state.c3.jobRef,
+        item_key:          'partial-signoff-' + Date.now(),
+        item_name:         noteText,
+        picked_qty:        1,
+        delivered_qty:     0,
+        shortfall:         1,
+        driver_name:       state.c3.driverName || null,
+        customer_postcode: s.postcode ? s.postcode.trim().toUpperCase() : null,
+        updated_at:        new Date().toISOString(),
+      };
+      const { error: remErr } = await sb.from('deliveries').insert(remedialRow);
+      if (remErr) { console.error(remErr); toast('Delivery saved but remedial alert failed - contact Neil'); }
+    }
 
     state.view = 'c3-done'; render();
   }
