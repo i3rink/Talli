@@ -1,4 +1,4 @@
-<!-- Talli v2.9.9 - deployed 30 Jul 2026 -->
+<!-- Talli v2.10.0 - deployed 31 Jul 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -612,7 +612,7 @@
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
   };
-  const VERSION = 'v2.9.9';
+  const VERSION = 'v2.10.0';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -883,7 +883,7 @@
       </div>` : '';
 
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="upload-cancel">&#8592; Cancel</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="upload-cancel">&#8592; Back</button></div>
       ${dupHtml}
       <div class="card">
         <div class="card-title">New Stock Check Session</div>
@@ -1193,7 +1193,7 @@
             <div style="margin-top:5px;">${(state.session.jobs || []).map(j => `<span class="job-tag">${esc(j.replace(/^Q/i,""))}</span>`).join("")}</div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;">
-            <button class="btn btn-ghost" data-action="go-home">&#8592; Home</button>
+            <button class="btn btn-ghost" data-action="go-home">&#8592; Back</button>
             <button class="btn btn-outline" data-action="submit-all" id="submit-all-btn">&#10003; Submit</button>
             <button class="btn btn-primary" data-action="go-report">Report &#8594;</button>
           </div>
@@ -1231,7 +1231,7 @@
         <div class="flex gap-2 flex-wrap mt-4">
           <button class="btn btn-primary" data-action="copy-report">&#128203; Copy Report</button>
           <button class="btn btn-ghost"   data-action="new-session">New Session</button>
-          <button class="btn btn-ghost"   data-action="go-home">&#8592; Home</button>
+          <button class="btn btn-ghost"   data-action="go-home">&#8592; Back</button>
         </div>
       </div>`;
   }
@@ -1241,7 +1241,7 @@
   ═══════════════════════════════════════════════ */
   function renderC2Home() {
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
       <div class="card">
         <div class="card-title">Pick Completion</div>
         <p class="text-muted text-sm" style="margin-bottom:16px;">Enter a job number to load the pick list for that job.</p>
@@ -1287,7 +1287,7 @@
     }).length;
 
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
       <div class="card">
         <div class="card-title">Jobs this week - ${esc(s.code)}</div>
         <p class="text-muted text-sm" style="margin-bottom:14px;">${jobs.length} job${jobs.length !== 1 ? 's' : ''} on this session${notStarted > 0 ? ' &middot; <span style="color:#ef4444;font-weight:600;">' + notStarted + ' not started</span>' : ' &middot; <span style="color:#059669;font-weight:600;">all picked</span>'}.</p>
@@ -1331,7 +1331,7 @@
 
     return `
       <div class="mod-back" style="display:flex;gap:8px;align-items:center;">
-        <button class="btn btn-ghost" data-action="go-home">&#8592; Home</button>
+        <button class="btn btn-ghost" data-action="go-home">&#8592; Back</button>
         <button class="btn btn-ghost" data-action="c2-back-jobs" style="font-size:.8rem;">&#9776; All jobs this week</button>
       </div>
       <div class="card">
@@ -1378,7 +1378,7 @@
         <div class="flex gap-2 flex-wrap mt-4">
           ${shorts.length > 0 ? `<button class="btn btn-primary" data-action="c2-copy-short">&#128203; Copy to Purchasing</button>` : ''}
           <button class="btn btn-ghost" data-action="c2-back-jobs">Back to Jobs</button>
-          <button class="btn btn-ghost" data-action="go-home">&#8592; Home</button>
+          <button class="btn btn-ghost" data-action="go-home">&#8592; Back</button>
         </div>
       </div>`;
   }
@@ -1388,7 +1388,7 @@
   ═══════════════════════════════════════════════ */
   function renderC3Home() {
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
       <div class="card">
         <div class="card-title">Driver Delivery</div>
         <p class="text-muted text-sm" style="margin-bottom:16px;">Enter your job number to see what to deliver on site.</p>
@@ -1565,7 +1565,7 @@
              <table class="shortfall-table"><thead><tr><th>Item</th><th>Expected</th><th>Delivered</th><th>Short</th></tr></thead><tbody>${shortRows}</tbody></table>`}
         <div class="flex gap-2 flex-wrap mt-4">
           <button class="btn btn-ghost" data-action="c3-another">Another Job</button>
-          <button class="btn btn-ghost" data-action="go-home">&#8592; Home</button>
+          <button class="btn btn-ghost" data-action="go-home">&#8592; Back</button>
         </div>
       </div>`;
   }
@@ -1639,7 +1639,7 @@
       </div>`;
     }).join('');
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
       <div class="card">
         <div class="card-title">Stock Checker</div>
         <p class="text-muted text-sm" style="margin-bottom:12px;">Pick a category, find the product, enter what's currently on the shelf.</p>
@@ -4746,7 +4746,7 @@
     };
 
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
       <div class="card">
         <div class="card-title">Goods In</div>
         <p class="text-muted text-sm" style="margin-bottom:14px;">Upload a PO PDF to start receiving a delivery.</p>
@@ -4896,7 +4896,7 @@
     }).join('');
 
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
       <div class="card" style="border-top:3px solid #0d9488;">
         <div class="card-title" style="color:#0d9488;">&#10003; Receipt recorded</div>
         <div style="font-weight:700;font-size:1rem;margin-bottom:2px;">PO ${esc(savedPo?.poNumber || '')}</div>
@@ -5047,6 +5047,30 @@
      INIT
   ═══════════════════════════════════════════════ */
   render();
+
+  // ── ANDROID BACK BUTTON FIX ──────────────────────────────────────────────
+  // Wrap render so every screen change pushes a history entry.
+  // Back button then navigates within Talli rather than exiting the PWA.
+  var _origRender = render;
+  render = function() {
+    _origRender();
+    history.pushState({ view: state.view, module: state.module }, '', location.href);
+  };
+
+  // Intercept back button — restore previous state and re-render
+  window.addEventListener('popstate', function(e) {
+    if (e.state && e.state.view) {
+      state.view   = e.state.view;
+      state.module = e.state.module || state.module;
+      _origRender();
+    } else {
+      // No previous state — keep user in app
+      history.pushState({ view: state.view, module: state.module }, '', location.href);
+    }
+  });
+
+  // Seed initial history entry on load
+  history.replaceState({ view: state.view, module: state.module }, '', location.href);
 
 })();
 </script>
