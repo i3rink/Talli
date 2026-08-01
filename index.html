@@ -1,4 +1,4 @@
-<!-- Talli v2.10.2 - deployed 31 Jul 2026 -->
+<!-- Talli v2.10.3 - deployed 01 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -732,6 +732,7 @@
     else if (v === 'c4-eol')       root.innerHTML = renderC4EOL();
     else if (v === 'c4-showroom')  root.innerHTML = renderC4Showroom();
     else if (v === 'c5-list')      root.innerHTML = renderC5List();
+    else if (v === 'c5-preview')   root.innerHTML = renderC5Preview();
     else if (v === 'c5-upload')    root.innerHTML = renderC5Upload();
     else if (v === 'c5-receive')   root.innerHTML = renderC5Receive();
     else if (v === 'c5-complete')  root.innerHTML = renderC5Complete();
@@ -4668,52 +4669,74 @@
     render();
   }
 
-  /* ── Supabase: save PO and lines after receipt ── */
-  async function saveGoodsInReceipt() {
-    const { po, lines, receipts, receiverName, arrivalType } = state.c5;
+  /* ── Supabase: stage 1 — save PO as pending (office uploads in advance) ── */
+  async function savePOPending() {
+    const { po } = state.c5;
     if (!po) return;
+
+    const { data: poRow, error: poErr } = await sb.from('goods_in_pos').upsert({
+      po_number: po.poNumber,
+      supplier:  po.supplier,
+      po_date:   po.poDate || null,
+      status:    'pending',
+    }, { onConflict: 'po_number' }).select().single();
+    if (poErr) { toast('Save failed — check connection'); console.error(poErr); return; }
+
+    const lineRows = po.items.map(item => ({
+      po_id:        poRow.id,
+      product_name: item.name,
+      sku:          item.sku || null,
+      ordered_qty:  item.qty,
+      resolved:     false,
+    }));
+
+    /* Delete any existing lines first (re-upload case) */
+    await sb.from('goods_in_lines').delete().eq('po_id', poRow.id);
+    const { error: lineErr } = await sb.from('goods_in_lines').insert(lineRows);
+    if (lineErr) { toast('Lines save failed'); console.error(lineErr); return; }
+
+    toast('PO saved');
+    state.c5.po = null;
+    state.c5.lines = [];
+    state.view = 'c5-list';
+    render();
+    loadC5POs();
+  }
+
+  /* ── Supabase: stage 2 — submit receipt against an existing pending PO ── */
+  async function saveGoodsInReceipt() {
+    const { activePo, lines, receipts, receiverName, arrivalType } = state.c5;
+    if (!activePo) return;
     if (!receiverName.trim()) { toast('Enter your name first'); return; }
 
-    /* Upsert the PO header */
-    const { data: poRow, error: poErr } = await sb.from('goods_in_pos').upsert({
-      po_number:    po.poNumber,
-      supplier:     po.supplier,
-      po_date:      po.poDate || null,
+    /* Update PO header to complete */
+    const { error: poErr } = await sb.from('goods_in_pos').update({
       received_by:  receiverName.trim(),
       arrival_type: arrivalType || 'delivery',
       received_at:  new Date().toISOString(),
       status:       'complete',
-    }, { onConflict: 'po_number' }).select().single();
+    }).eq('id', activePo.id);
     if (poErr) { toast('Save failed — check connection'); console.error(poErr); return; }
 
-    /* Insert lines */
-    const lineRows = lines.map((line, idx) => {
+    /* Update each line with receipt data */
+    for (let idx = 0; idx < lines.length; idx++) {
+      const line = lines[idx];
       const r = receipts[idx] || {};
-      const status     = r.status || 'ok';
-      const receivedQty = status === 'ok' ? line.qty : (Number(r.receivedQty) || 0);
-      const damagedQty  = status === 'damaged' || status === 'partial_damaged'
-        ? (Number(r.damagedQty) || 0) : 0;
-      const hasPartial  = receivedQty < line.qty;
+      const status      = r.status || 'ok';
+      const receivedQty = status === 'ok' ? line.ordered_qty : (Number(r.receivedQty) || 0);
+      const damagedQty  = (status === 'damaged' || status === 'partial_damaged') ? (Number(r.damagedQty) || 0) : 0;
+      const hasPartial  = receivedQty < line.ordered_qty;
       const hasDamage   = damagedQty > 0;
-      return {
-        po_id:        poRow.id,
-        product_name: line.name,
-        sku:          line.sku || null,
-        ordered_qty:  line.qty,
+      await sb.from('goods_in_lines').update({
         received_qty: receivedQty,
         damaged_qty:  damagedQty,
         has_partial:  hasPartial,
         has_damage:   hasDamage,
-        resolved:     false,
-      };
-    });
+      }).eq('id', line.id);
+    }
 
-    const { error: lineErr } = await sb.from('goods_in_lines').insert(lineRows);
-    if (lineErr) { toast('Lines save failed'); console.error(lineErr); return; }
-
-    toast('Goods In recorded');
-    state.c5.view = 'complete';
-    state.c5.savedPo = po;
+    toast('Receipt recorded');
+    state.c5.savedPo = activePo;
     state.view = 'c5-complete';
     render();
   }
@@ -4723,21 +4746,23 @@
     const pos = state.c5.pos || [];
     const loading = state.c5.loading;
 
-    const openPos = pos.filter(p => p.status !== 'complete');
-    const donePos = pos.filter(p => p.status === 'complete');
+    const pendingPos  = pos.filter(p => p.status === 'pending');
+    const completePos = pos.filter(p => p.status === 'complete');
 
-    const renderPoCard = (p, open) => {
-      const lineCount = (p.goods_in_lines || []).length;
+    const renderPoCard = (p) => {
+      const isPending = p.status === 'pending';
       const exCount   = (p.goods_in_lines || []).filter(l => !l.resolved && (l.has_partial || l.has_damage)).length;
       return `
-        <div class="gi-po-card">
-          <div class="gi-po-num">PO ${esc(p.po_number)}</div>
-          <div class="gi-po-meta">
-            <div class="gi-po-supplier">${esc(p.supplier || 'Unknown supplier')}</div>
-            <div class="gi-po-date">${p.po_date ? new Date(p.po_date).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : 'Date not recorded'}</div>
+        <div class="gi-po-card ${isPending ? 'gi-po-pending' : ''}" ${isPending ? `data-action="gi-open-receive" data-id="${esc(p.id)}"` : ''} style="${isPending ? 'cursor:pointer;' : ''}">
+          <div style="flex:1;min-width:0;">
+            <div class="gi-po-num">PO ${esc(p.po_number)}</div>
+            <div class="gi-po-meta">
+              <div class="gi-po-supplier">${esc(p.supplier || 'Unknown supplier')}</div>
+              <div class="gi-po-date">${p.po_date ? new Date(p.po_date + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : 'Date not recorded'}</div>
+            </div>
           </div>
-          ${open
-            ? `<span class="gi-po-badge open">Awaiting</span>`
+          ${isPending
+            ? `<span class="gi-po-badge open">On order</span>`
             : `<span class="gi-po-badge complete">${exCount > 0 ? exCount + ' exception' + (exCount > 1 ? 's' : '') : '&#10003; Done'}</span>`}
           <button class="btn btn-ghost" data-action="gi-delete-po" data-id="${esc(p.id)}" data-ref="${esc(p.po_number)}"
             style="padding:3px 8px;font-size:.72rem;color:var(--red);border-color:var(--red);margin-left:6px;flex-shrink:0;"
@@ -4749,7 +4774,7 @@
       <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
       <div class="card">
         <div class="card-title">Goods In</div>
-        <p class="text-muted text-sm" style="margin-bottom:14px;">Upload a PO PDF to start receiving a delivery.</p>
+        <p class="text-muted text-sm" style="margin-bottom:14px;">Upload a PO PDF when an order is placed. When the goods arrive, tap the PO to receive it.</p>
         ${state.c5.uploadError ? `
           <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.83rem;color:#b91c1c;line-height:1.5;">
             &#9888; ${esc(state.c5.uploadError)}
@@ -4760,12 +4785,12 @@
         </label>
       </div>
       ${loading ? '<div class="dash-loading">Loading&hellip;</div>' : ''}
-      ${!loading && openPos.length ? `
-        <div class="gi-section-label">Open POs</div>
-        ${openPos.map(p => renderPoCard(p, true)).join('')}` : ''}
-      ${!loading && donePos.length ? `
+      ${!loading && pendingPos.length ? `
+        <div class="gi-section-label">On order — tap to receive</div>
+        ${pendingPos.map(p => renderPoCard(p)).join('')}` : ''}
+      ${!loading && completePos.length ? `
         <div class="gi-section-label">Completed</div>
-        ${donePos.map(p => renderPoCard(p, false)).join('')}` : ''}
+        ${completePos.map(p => renderPoCard(p)).join('')}` : ''}
       ${!loading && !pos.length ? `<div class="text-muted text-sm" style="text-align:center;padding:24px 0;">No POs recorded yet.</div>` : ''}`;
   }
 
@@ -4780,10 +4805,36 @@
       </div>`;
   }
 
-  /* ── RENDER: receive lines ── */
-  function renderC5Receive() {
-    const { po, lines, receipts, receiverName } = state.c5;
+  /* ── RENDER: preview parsed PO before saving (stage 1) ── */
+  function renderC5Preview() {
+    const { po } = state.c5;
     if (!po) return renderC5List();
+    const lineRows = (po.items || []).map(item => `
+      <div class="gi-line">
+        <div class="gi-line-name">${esc(item.name)}</div>
+        ${item.sku ? `<div class="gi-line-sku">${esc(item.sku)}</div>` : ''}
+        <div class="gi-line-ordered">Qty: ${item.qty}${item.unit && item.unit !== 'pcs' ? ' ' + item.unit : ''}</div>
+      </div>`).join('');
+    return `
+      <div class="mod-back" style="display:flex;justify-content:space-between;align-items:center;">
+        <button class="btn btn-ghost" data-action="c5-back-list">&#8592; Cancel</button>
+      </div>
+      <div class="card">
+        <div class="card-title">PO ${esc(po.poNumber)}</div>
+        ${po.supplier ? `<div class="text-muted text-sm" style="margin-bottom:4px;">${esc(po.supplier)}</div>` : ''}
+        ${po.poDate   ? `<div class="text-muted text-sm" style="margin-bottom:12px;">${esc(po.poDate)}</div>` : ''}
+        <p class="text-muted text-sm" style="margin-bottom:0;">${(po.items || []).length} line item${(po.items || []).length !== 1 ? 's' : ''} parsed from PDF</p>
+      </div>
+      ${lineRows}
+      <button class="btn btn-primary" data-action="gi-save-pending" style="width:100%;margin-top:8px;">
+        Save PO &#8594;
+      </button>`;
+  }
+
+  /* ── RENDER: receive lines against a saved pending PO (stage 2) ── */
+  function renderC5Receive() {
+    const { activePo, lines, receipts, receiverName } = state.c5;
+    if (!activePo) return renderC5List();
 
     const total = lines.length;
     const done  = lines.filter((_, i) => receipts[i] && receipts[i].status).length;
@@ -4797,9 +4848,9 @@
 
       return `
         <div class="gi-line ${st ? 'gi-line-done' : ''}">
-          <div class="gi-line-name">${esc(line.name)}</div>
+          <div class="gi-line-name">${esc(line.product_name)}</div>
           ${line.sku ? `<div class="gi-line-sku">${esc(line.sku)}</div>` : ''}
-          <div class="gi-line-ordered">Ordered: ${line.qty}${line.unit && line.unit !== 'pcs' ? ' ' + line.unit : ''}</div>
+          <div class="gi-line-ordered">Ordered: ${line.ordered_qty}</div>
           <div class="gi-btn-row">
             <button class="gi-status-btn ${st === 'ok' ? 'active-ok' : ''}"
               data-action="gi-set-status" data-idx="${idx}" data-status="ok">&#10003; All received</button>
@@ -4813,12 +4864,12 @@
           ${needsReceived || needsDamaged ? `<div class="gi-sub-fields">
             ${needsReceived ? `<div>
               <label>How many actually arrived?</label>
-              <input type="number" min="0" max="${line.qty}" value="${r.receivedQty || ''}"
+              <input type="number" min="0" max="${line.ordered_qty}" value="${r.receivedQty || ''}"
                 placeholder="e.g. 12" data-action="gi-qty-input" data-idx="${idx}" data-field="receivedQty" />
             </div>` : ''}
             ${needsDamaged ? `<div>
               <label>How many are damaged?</label>
-              <input type="number" min="0" max="${line.qty}" value="${r.damagedQty || ''}"
+              <input type="number" min="0" max="${line.ordered_qty}" value="${r.damagedQty || ''}"
                 placeholder="e.g. 3" data-action="gi-qty-input" data-idx="${idx}" data-field="damagedQty" />
             </div>` : ''}
           </div>` : ''}
@@ -4828,14 +4879,13 @@
     return `
       <div class="mod-back" style="display:flex;justify-content:space-between;align-items:center;">
         <button class="btn btn-ghost" data-action="c5-back-list">&#8592; Back to POs</button>
-        <button class="btn btn-ghost" data-action="c5-discard-po" style="color:var(--red);border-color:var(--red);font-size:.8rem;">&#128465; Discard this PO</button>
       </div>
       <div class="card">
         <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">
-          <div class="card-title" style="margin:0;">PO ${esc(po.poNumber)}</div>
-          <div class="text-muted text-sm">${esc(po.supplier)}</div>
+          <div class="card-title" style="margin:0;">PO ${esc(activePo.po_number)}</div>
+          <div class="text-muted text-sm">${esc(activePo.supplier || '')}</div>
         </div>
-        ${po.poDate ? `<div class="text-muted text-sm" style="margin-bottom:12px;">${esc(po.poDate)}</div>` : ''}
+        ${activePo.po_date ? `<div class="text-muted text-sm" style="margin-bottom:12px;">${esc(activePo.po_date)}</div>` : ''}
 
         <div class="gi-name-label">How did it arrive?</div>
         <div class="gi-btn-row" style="margin-bottom:16px;">
@@ -4877,7 +4927,7 @@
       let icon = '&#10003;', detail = 'All received';
       if (st === 'partial') {
         icon = '&#8776;';
-        detail = `${r.receivedQty || '?'} of ${line.qty} received`;
+        detail = `${r.receivedQty || '?'} of ${line.ordered_qty} received`;
       } else if (st === 'damaged') {
         icon = '&#9888;';
         detail = `${r.damagedQty || '?'} damaged on arrival`;
@@ -4889,21 +4939,21 @@
         <div class="gi-complete-line">
           <div class="gi-complete-icon" style="color:${st === 'ok' ? 'var(--green)' : '#d97706'}">${icon}</div>
           <div class="gi-complete-detail">
-            <div>${esc(line.name)}${line.sku ? ` <span class="item-sku">${esc(line.sku)}</span>` : ''}</div>
+            <div>${esc(line.product_name)}${line.sku ? ` <span class="item-sku">${esc(line.sku)}</span>` : ''}</div>
             <div style="color:var(--muted);font-size:.75rem;margin-top:1px;">${detail}</div>
           </div>
         </div>`;
     }).join('');
 
     return `
-      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Home</button></div>
       <div class="card" style="border-top:3px solid #0d9488;">
         <div class="card-title" style="color:#0d9488;">&#10003; Receipt recorded</div>
-        <div style="font-weight:700;font-size:1rem;margin-bottom:2px;">PO ${esc(savedPo?.poNumber || '')}</div>
+        <div style="font-weight:700;font-size:1rem;margin-bottom:2px;">PO ${esc(savedPo?.po_number || '')}</div>
         <div class="text-muted text-sm">${esc(savedPo?.supplier || '')}</div>
         <div style="margin-top:10px;font-size:.82rem;color:var(--muted);">
           ${arrivalType === 'collection' ? '&#128230; Collection' : '&#128666; Delivery'}
-          &nbsp;&middot;&nbsp; Counted by <strong>${esc(receiverName || '—')}</strong>
+          &nbsp;&middot;&nbsp; Counted by <strong>${esc(receiverName || '')}</strong>
         </div>
         ${exceptions.length ? `
           <div style="margin-top:12px;padding:10px 12px;background:#fef3c7;border-radius:8px;font-size:.82rem;color:#92400e;font-weight:600;">
@@ -4922,20 +4972,35 @@
       </button>`;
   }
 
-  /* ── Goods In action handlers (added to bindEvents) ── */
+  /* ── Goods In action handlers ── */
   function bindC5Events(action, btn, e) {
-    if (action === 'gi-file-pick') return; /* handled by change listener below */
+    if (action === 'gi-file-pick') return;
 
-    if (action === 'c5-discard-po') {
-      if (!confirm('Discard this PO? Nothing will be saved.')) return true;
-      state.view = 'c5-list';
-      state.c5.po = null; state.c5.lines = []; state.c5.receipts = {};
-      state.c5.uploadError = null;
-      render(); loadC5POs(); return true;
+    if (action === 'gi-save-pending') {
+      savePOPending(); return true;
+    }
+    if (action === 'gi-open-receive') {
+      const id = btn.dataset.id;
+      const po = (state.c5.pos || []).find(p => p.id === id);
+      if (!po) return true;
+      (async () => {
+        const { data: lineData, error } = await sb.from('goods_in_lines')
+          .select('*').eq('po_id', id).order('created_at', { ascending: true });
+        if (error || !lineData) { toast('Could not load PO lines'); return; }
+        state.c5.activePo   = po;
+        state.c5.lines      = lineData;
+        state.c5.receipts   = {};
+        state.c5.receiverName = '';
+        state.c5.arrivalType  = 'delivery';
+        state.view = 'c5-receive';
+        render();
+      })();
+      return true;
     }
     if (action === 'c5-back-list') {
       state.view = 'c5-list';
-      state.c5.po = null; state.c5.lines = []; state.c5.receipts = {};
+      state.c5.po = null; state.c5.activePo = null;
+      state.c5.lines = []; state.c5.receipts = {};
       state.c5.uploadError = null;
       render(); loadC5POs(); return true;
     }
@@ -4947,17 +5012,12 @@
       if (!pin) return true;
       if (String(pin).trim() !== String(DASH_PIN)) { toast('Incorrect PIN — deletion cancelled'); return true; }
       (async () => {
-        /* Delete lines first (FK constraint), then header */
         await sb.from('goods_in_lines').delete().eq('po_id', id);
         const { error } = await sb.from('goods_in_pos').delete().eq('id', id);
         if (error) { toast('Delete failed — check connection'); return; }
         toast(`${ref} deleted`);
         loadC5POs();
       })();
-      return true;
-    }
-    if (action === 'c5-open-po') {
-      /* view-only for completed POs — future detail view can go here */
       return true;
     }
     if (action === 'gi-arrival-type') {
@@ -4976,7 +5036,6 @@
       const field = btn.dataset.field;
       if (!state.c5.receipts[idx]) state.c5.receipts[idx] = {};
       state.c5.receipts[idx][field] = btn.value;
-      /* no re-render on every keystroke — just update state */
       return true;
     }
     if (action === 'gi-name-input') {
@@ -5000,7 +5059,6 @@
       state.view = 'c5-upload'; render();
       try {
         const text = await extractPdfText(file);
-        /* Reject invoices — must be a Purchase Order */
         const isPO      = /PURCHASE\s+ORDER/i.test(text);
         const isInvoice = /\bINVOICE\b/i.test(text);
         if (isInvoice && !isPO) {
@@ -5018,7 +5076,7 @@
         state.c5.po    = po;
         state.c5.lines = po.items;
         state.c5.receipts = {};
-        state.view = 'c5-receive';
+        state.view = 'c5-preview';
         render();
       } catch (err) {
         console.error('GI parse error:', err);
