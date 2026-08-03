@@ -1,4 +1,4 @@
-<!-- Talli v2.11.5 - deployed 03 Aug 2026 -->
+<!-- Talli v2.12.0 - deployed 03 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -617,7 +617,7 @@
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.11.5';
+  const VERSION = 'v2.12.0';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -2967,31 +2967,46 @@
     if (action === 'c2-select-job') { state.c2.selectedJob = btn.dataset.job; state.view = 'c2-pick'; render(); return; }
     if (action === 'c2-back-jobs')  { state.view = 'c2-jobs'; render(); return; }
     if (action === 'c2-submit')     { submitC2Picks(); return; }
-    if (action === 'dash-send-to-wt') {
+    if (action === 'dash-raise-order') {
       const job = btn.dataset.job;
       if (!job) return;
-      if (!confirm('Send remedial for job ' + job.replace(/^Q/i,'') + ' to the warehouse team?')) return;
+      const poRef = prompt('Enter the Moon Invoice PO number for job ' + job.replace(/^Q/i,'') + ':');
+      if (!poRef || !poRef.trim()) return;
+      const cleanPO = poRef.trim();
       (async () => {
-        /* find all deliveries shortfall rows for this job */
-        const { data: rows } = await sb.from('deliveries')
-          .select('*').eq('job_ref', job).gt('shortfall', 0);
-        if (!rows || !rows.length) { toast('No shortfall items found for job ' + job.replace(/^Q/i,'')); return; }
-        /* upsert into remedials — delete pending first to avoid dupes */
-        await sb.from('remedials').delete().eq('job_ref', job).eq('status', 'pending');
-        const remedialRows = rows.map(r => ({
-          session_id:    r.session_id,
-          job_ref:       r.job_ref,
-          item_key:      r.item_key,
-          item_name:     r.item_name,
-          shortfall_qty: r.shortfall,
-          status:        'ready',
-          actioned_at:   new Date().toISOString(),
-          created_at:    new Date().toISOString(),
-        }));
-        const { error } = await sb.from('remedials').insert(remedialRows);
-        if (error) { toast('Failed: ' + (error.message || 'unknown')); return; }
-        toast('Sent to warehouse team');
-        await loadC6BadgeCount();
+        /* flip existing pending remedials for this job to ordered, store po_ref */
+        const { data: existing } = await sb.from('remedials')
+          .select('id').eq('job_ref', job).eq('status', 'pending');
+        if (!existing || !existing.length) {
+          /* no pending rows — could be first raise after a check; create from deliveries shortfall */
+          const { data: rows } = await sb.from('deliveries')
+            .select('*').eq('job_ref', job).gt('shortfall', 0);
+          if (!rows || !rows.length) { toast('No shortfall items found for job ' + job.replace(/^Q/i,'')); return; }
+          await sb.from('remedials').delete().eq('job_ref', job).eq('status', 'pending');
+          const remedialRows = rows.map(r => ({
+            session_id:    r.session_id,
+            job_ref:       r.job_ref,
+            item_key:      r.item_key,
+            item_name:     r.item_name,
+            shortfall_qty: r.shortfall,
+            status:        'ordered',
+            po_ref:        cleanPO,
+            ordered_at:    new Date().toISOString(),
+            created_at:    new Date().toISOString(),
+          }));
+          const { error } = await sb.from('remedials').insert(remedialRows);
+          if (error) { toast('Failed: ' + (error.message || 'unknown')); return; }
+        } else {
+          const { error } = await sb.from('remedials')
+            .update({ status: 'ordered', po_ref: cleanPO, ordered_at: new Date().toISOString() })
+            .eq('job_ref', job).eq('status', 'pending');
+          if (error) { toast('Failed: ' + (error.message || 'unknown')); return; }
+        }
+        if (!state.dashRemedialPORefs) state.dashRemedialPORefs = {};
+        state.dashRemedialPORefs[job] = cleanPO;
+        /* open Moon Invoice in new tab */
+        window.open('https://app.mooninvoice.com', '_blank');
+        toast('Order raised — PO ' + cleanPO + ' recorded');
         render();
       })();
       return;
@@ -3751,6 +3766,16 @@
       const { data: delivs } = await sb.from('deliveries')
         .select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200);
 
+      /* load raised PO refs for pending/ordered remedials */
+      const { data: remedialPoData } = await sb.from('remedials')
+        .select('job_ref, po_ref').eq('status', 'ordered').not('po_ref', 'is', null);
+      state.dashRemedialPORefs = {};
+      if (remedialPoData) {
+        remedialPoData.forEach(r => {
+          if (r.po_ref) state.dashRemedialPORefs[r.job_ref] = r.po_ref;
+        });
+      }
+
       const { data: shortChecks } = await sb.from('checks')
         .select('*').in('status', ['short', 'part'])
         .order('updated_at', { ascending: false }).limit(300);
@@ -4108,18 +4133,23 @@
         const key = 'm3-' + job;
         const isOpen = !!state.dashExpanded[key];
         const driver = items[0]?.driver_name ? ` &middot; ${esc(items[0].driver_name)}` : '';
+        const isRemedialJob = items.some(i => i.is_remedial);
         const itemRows = items.map(i => `
           <div class="dash-item">
             <div class="dash-item-name">${esc(i.item_name)}</div>
             <span class="dash-item-detail">Expected ${i.picked_qty} &middot; Delivered ${i.delivered_qty}</span>
             <span class="dash-item-short">Short ${i.shortfall}</span>
           </div>`).join('');
+        const job_poRef = state.dashRemedialPORefs ? (state.dashRemedialPORefs[job] || '') : '';
         return `
           <div class="dash-session">
             <div class="dash-session-head" data-action="dash-expand" data-key="${esc(key)}">
-              <div class="dash-session-code">Job ${esc(job)}${driver}</div>
+              <div class="dash-session-code">Job ${esc(job)}${driver}${isRemedialJob ? ' <span style="font-size:.68rem;background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:4px;font-weight:600;vertical-align:middle;">REMEDIAL</span>' : ''}</div>
               <div class="dash-session-meta">${items.length} item${items.length !== 1 ? 's' : ''}</div>
-              <button class="btn btn-sm" style="background:#dc2626;color:#fff;font-size:.75rem;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;" data-action="dash-send-to-wt" data-job="${esc(job)}" title="Send to warehouse team">Send to warehouse</button>
+              ${job_poRef
+  ? `<span style="font-size:.72rem;background:#d1fae5;color:#065f46;padding:3px 8px;border-radius:6px;white-space:nowrap;">PO ${esc(job_poRef)} raised</span>`
+  : `<button class="btn btn-sm" style="background:#0075ab;color:#fff;font-size:.75rem;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;" data-action="dash-raise-order" data-job="${esc(job)}" title="Raise a PO for these items">Raise order</button>`
+}
               <button class="dash-archive-btn" data-action="dash-archive-m3" data-job="${esc(job)}" title="Mark job as complete">Archive</button>
               <div class="dash-session-chevron ${isOpen ? 'open' : ''}" data-key="${esc(key)}">&#9658;</div>
             </div>
@@ -4724,6 +4754,7 @@
     if (s.deliveryStatus === 'partial') {
       const noteText = s.notes ? s.notes.trim() : 'Partial delivery - see sign-off notes';
       const remedialRow = {
+        is_remedial:   true,
         session_id:        sessionId,
         job_ref:           state.c3.jobRef,
         item_key:          'partial-signoff-' + Date.now(),
@@ -4897,7 +4928,32 @@
       }).eq('id', line.id);
     }
 
-    toast('Receipt recorded');
+    /* automatch: flip any ordered remedials with matching po_ref to ready */
+    const savedPoNumber = activePo.po_number || '';
+    if (savedPoNumber) {
+      const normalise = s => s.replace(/^(PO|#|\s)+/i, '').replace(/\s+/g, '').toLowerCase();
+      const normSaved = normalise(savedPoNumber);
+      const { data: matchedRemedials } = await sb.from('remedials')
+        .select('id, po_ref').eq('status', 'ordered').not('po_ref', 'is', null);
+      if (matchedRemedials && matchedRemedials.length) {
+        const matchIds = matchedRemedials
+          .filter(r => normalise(r.po_ref || '') === normSaved)
+          .map(r => r.id);
+        if (matchIds.length) {
+          await sb.from('remedials')
+            .update({ status: 'ready', actioned_at: new Date().toISOString() })
+            .in('id', matchIds);
+          await loadC6BadgeCount();
+          toast('Receipt recorded — ' + matchIds.length + ' remedial item' + (matchIds.length !== 1 ? 's' : '') + ' ready to pick');
+        } else {
+          toast('Receipt recorded — no matching remedial PO found');
+        }
+      } else {
+        toast('Receipt recorded');
+      }
+    } else {
+      toast('Receipt recorded');
+    }
     state.c5.savedPo = activePo;
     state.view = 'c5-complete';
     render();
