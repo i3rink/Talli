@@ -1,4 +1,4 @@
-<!-- Talli v2.11.0 - deployed 01 Aug 2026 -->
+<!-- Talli v2.11.1 - deployed 03 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -617,7 +617,7 @@
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.11.0';
+  const VERSION = 'v2.11.1';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -2966,6 +2966,35 @@
     if (action === 'c2-select-job') { state.c2.selectedJob = btn.dataset.job; state.view = 'c2-pick'; render(); return; }
     if (action === 'c2-back-jobs')  { state.view = 'c2-jobs'; render(); return; }
     if (action === 'c2-submit')     { submitC2Picks(); return; }
+    if (action === 'dash-send-to-wt') {
+      const job = btn.dataset.job;
+      if (!job) return;
+      if (!confirm('Send remedial for job ' + job.replace(/^Q/i,'') + ' to the warehouse team?')) return;
+      (async () => {
+        /* find all deliveries shortfall rows for this job */
+        const { data: rows } = await sb.from('deliveries')
+          .select('*').eq('job_ref', job).gt('shortfall', 0);
+        if (!rows || !rows.length) { toast('No shortfall items found for job ' + job.replace(/^Q/i,'')); return; }
+        /* upsert into remedials — delete pending first to avoid dupes */
+        await sb.from('remedials').delete().eq('job_ref', job).eq('status', 'pending');
+        const remedialRows = rows.map(r => ({
+          session_id:    r.session_id,
+          job_ref:       r.job_ref,
+          item_key:      r.item_key,
+          item_name:     r.item_name,
+          shortfall_qty: r.shortfall,
+          status:        'ready',
+          actioned_at:   new Date().toISOString(),
+          created_at:    new Date().toISOString(),
+        }));
+        const { error } = await sb.from('remedials').insert(remedialRows);
+        if (error) { toast('Failed: ' + (error.message || 'unknown')); return; }
+        toast('Sent to warehouse team');
+        await loadC6BadgeCount();
+        render();
+      })();
+      return;
+    }
     if (action === 'c6-mark-ready') {
       const id = btn.dataset.id;
       if (id) markRemedialReady(id);
@@ -4089,6 +4118,7 @@
             <div class="dash-session-head" data-action="dash-expand" data-key="${esc(key)}">
               <div class="dash-session-code">Job ${esc(job)}${driver}</div>
               <div class="dash-session-meta">${items.length} item${items.length !== 1 ? 's' : ''}</div>
+              <button class="btn btn-sm" style="background:#dc2626;color:#fff;font-size:.75rem;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;" data-action="dash-send-to-wt" data-job="${esc(job)}" title="Send to warehouse team">Send to warehouse</button>
               <button class="dash-archive-btn" data-action="dash-archive-m3" data-job="${esc(job)}" title="Mark job as complete">Archive</button>
               <div class="dash-session-chevron ${isOpen ? 'open' : ''}" data-key="${esc(key)}">&#9658;</div>
             </div>
@@ -4105,9 +4135,7 @@
         </div>
         <div class="dash-module-body${state.dashModuleExpanded.m3 ? ' open' : ''}" data-module="m3">
         ${jobBlocks}
-        <div class="dash-footer">
-          <button class="btn btn-ghost" data-action="copy-dash-m3" style="font-size:.8rem;padding:6px 14px;">&#128722; Send remedial list</button>
-        </div>
+
         </div>
       </div>`;
     }
