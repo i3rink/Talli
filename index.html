@@ -1,4 +1,4 @@
-<!-- Talli v2.11.4 - deployed 03 Aug 2026 -->
+<!-- Talli v2.11.5 - deployed 03 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -617,7 +617,7 @@
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.11.4';
+  const VERSION = 'v2.11.5';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -4458,7 +4458,7 @@
     state.c6.loading = true;
     const { data, error } = await sb.from('remedials')
       .select('*')
-      .in('status', ['pending', 'ready'])
+      .eq('status', 'ready')
       .order('created_at', { ascending: false });
     if (error) { console.error('C6 load error:', error); state.c6.loading = false; return; }
     state.c6.items = data || [];
@@ -4507,44 +4507,30 @@
   }
 
   function renderC6List() {
-    const items = state.c6.items;
-    if (state.c6.loading) return '<div class="card"><div class="text-muted text-sm">Loading remedials...</div></div>';
+    const items = state.c6.items.filter(r => r.status === 'ready');
+    if (state.c6.loading) return '<div class="card"><div class="text-muted text-sm">Loading...</div></div>';
 
-    const pending = items.filter(r => r.status === 'pending');
-    const ready   = items.filter(r => r.status === 'ready');
-
-    const renderItem = (r, showReadyBtn) => {
+    const renderItem = r => {
       const jobDisplay = displayJobRef(r.job_ref || '');
-      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 0;border-bottom:1px solid var(--border);">'
+      const name = (r.item_name && r.item_name.trim() && r.item_name !== '.') ? r.item_name : (r.item_key || 'Item');
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 0;border-bottom:1px solid var(--border);">'
         + '<div>'
-        + '<div style="font-weight:600;font-size:.92rem;">' + esc(r.item_name || r.item_key) + '</div>'
-        + '<div style="font-size:.78rem;color:var(--muted);margin-top:2px;">Job ' + esc(jobDisplay) + ' &middot; Qty ' + r.shortfall_qty + '</div>'
+        + '<div style="font-weight:600;font-size:.95rem;">' + esc(name) + '</div>'
+        + '<div style="font-size:.8rem;color:var(--muted);margin-top:3px;">Job ' + esc(jobDisplay) + ' &middot; Qty ' + r.shortfall_qty + '</div>'
         + '</div>'
-        + (showReadyBtn
-            ? '<button class="btn btn-sm" style="background:var(--teal);color:#fff;white-space:nowrap;flex-shrink:0;" data-action="c6-mark-ready" data-id="' + r.id + '">Mark ready</button>'
-            : '<button class="btn btn-sm" style="background:#059669;color:#fff;white-space:nowrap;flex-shrink:0;" data-action="c6-mark-complete" data-id="' + r.id + '">Picked &amp; packed</button>'
-          )
+        + '<button class="btn btn-sm" style="background:#059669;color:#fff;white-space:nowrap;flex-shrink:0;padding:8px 14px;" data-action="c6-mark-complete" data-id="' + r.id + '">Picked &amp; packed</button>'
         + '</div>';
     };
 
-    const readyHtml = ready.length
-      ? ready.map(r => renderItem(r, false)).join('')
-      : '<div class="text-muted text-sm" style="padding:12px 0;">No remedials ready to pick.</div>';
-
-    const pendingHtml = pending.length
-      ? pending.map(r => renderItem(r, true)).join('')
-      : '<div class="text-muted text-sm" style="padding:12px 0;">No pending remedials.</div>';
+    const bodyHtml = items.length
+      ? items.map(renderItem).join('')
+      : '<div class="text-muted text-sm" style="padding:16px 0;">No remedials outstanding.</div>';
 
     return '<div class="module-wrap">'
       + '<button class="btn btn-ghost back-btn" data-action="go-home">&#8592; Home</button>'
       + '<h2 class="module-title">Remedial Deliveries</h2>'
-      + '<div class="card" style="margin-bottom:14px;">'
-      + '<div style="font-family:Bricolage Grotesque,sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px;">Ready to pick</div>'
-      + readyHtml
-      + '</div>'
       + '<div class="card">'
-      + '<div style="font-family:Bricolage Grotesque,sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px;">Pending (packing slip not yet made)</div>'
-      + pendingHtml
+      + bodyHtml
       + '</div>'
       + '</div>';
   }
