@@ -1,4 +1,4 @@
-<!-- Talli v2.12.1 - deployed 03 Aug 2026 -->
+<!-- Talli v2.12.2 - deployed 03 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -617,7 +617,7 @@
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.12.1';
+  const VERSION = 'v2.12.2';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -2972,7 +2972,7 @@
       if (!job) return;
       if (!state.dashMoonOpened) state.dashMoonOpened = {};
       state.dashMoonOpened[job] = true;
-      window.open('https://app.mooninvoice.com', '_blank');
+      window.open('https://mooninvoice.com', '_blank');
       render();
       return;
     }
