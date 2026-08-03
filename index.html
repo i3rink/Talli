@@ -1,4 +1,4 @@
-<!-- Talli v2.11.2 - deployed 03 Aug 2026 -->
+<!-- Talli v2.11.3 - deployed 03 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -283,9 +283,11 @@
     .lp-card.c-orange { border-top-color: #ea580c; }
     .lp-card.c-purple { border-top-color: #7c3aed; opacity: .85; }
     .lp-card.c-teal   { border-top-color: #0d9488; }
-    .lp-card.c-red    { border-top-color: #dc2626; }
-    /* M6 remedial badge */
-    .lp-badge-count { position: absolute; bottom: 12px; left: 12px; background: #dc2626; color: #fff; font-size: .78rem; font-weight: 800; min-width: 22px; height: 22px; border-radius: 11px; display: flex; align-items: center; justify-content: center; padding: 0 6px; line-height: 1; box-shadow: 0 2px 6px rgba(220,38,38,.45); }
+    .lp-card.c-slate  { border-top-color: #475569; }
+    /* M6 remedial badge — iOS style, anchored to glyph wrapper */
+    .lp-glyph-wrap { position: absolute; top: 14px; right: 16px; display: inline-flex; }
+    .lp-glyph-wrap .lp-glyph { position: static; }
+    .lp-badge-count { position: absolute; top: -7px; right: -7px; background: #dc2626; color: #fff; font-size: .68rem; font-weight: 800; min-width: 18px; height: 18px; border-radius: 9px; display: flex; align-items: center; justify-content: center; padding: 0 4px; line-height: 1; border: 2px solid var(--surface); }
 
     .lp-num { font-family: 'Bricolage Grotesque', sans-serif; font-size: .72rem; font-weight: 700; letter-spacing: .1em; }
     .lp-card.c-blue   .lp-num { color: #0075ab; }
@@ -293,7 +295,7 @@
     .lp-card.c-orange .lp-num { color: #ea580c; }
     .lp-card.c-purple .lp-num { color: #7c3aed; }
     .lp-card.c-teal   .lp-num { color: #0d9488; }
-    .lp-card.c-red    .lp-num { color: #dc2626; }
+    .lp-card.c-slate  .lp-num { color: #475569; }
 
     /* ── Module 5 - Goods In ── */
     .gi-po-card { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; background: var(--bg); transition: box-shadow .15s; margin-bottom: 8px; }
@@ -615,9 +617,9 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
-    remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
+    remedial:   { main: '#475569', dark: '#334155', light: '#e2e8f0', faint: '#f8fafc' },
   };
-  const VERSION = 'v2.11.2';
+  const VERSION = 'v2.11.3';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -811,7 +813,7 @@
           <span class="lp-desc">Receive deliveries and collections against purchase orders.</span>
           <span class="lp-glyph" style="color:#0d9488;">${ic.inbox}</span>
         </button>
-        <button class="lp-card c-red" data-action="open-module" data-mod="remedial">
+        <button class="lp-card c-slate" data-action="open-module" data-mod="remedial">
           ${state.c6.badgeCount > 0 ? `<span class="lp-badge">${state.c6.badgeCount}</span>` : ''}
           <span class="lp-num">06</span>
           <span class="lp-name">Remedials</span>
