@@ -261,7 +261,7 @@
     .lp-intro h1 { font-family: 'Bricolage Grotesque', sans-serif; font-size: 1.4rem; font-weight: 700; color: var(--text); margin-bottom: 2px; }
 
     .lp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
-    .lp-grid > :nth-child(5) { grid-column: 1 / -1; }
+    /* M5 and M6 share bottom row — no full-width override */
     .lp-card {
       position: relative;
       display: flex; flex-direction: column; gap: 6px;
@@ -283,6 +283,10 @@
     .lp-card.c-orange { border-top-color: #ea580c; }
     .lp-card.c-purple { border-top-color: #7c3aed; opacity: .85; }
     .lp-card.c-teal   { border-top-color: #0d9488; }
+    .lp-card.c-red    { border-top-color: #dc2626; }
+    /* M6 remedial badge */
+    .lp-card { position: relative; }
+    .lp-badge-count { position: absolute; top: 8px; right: 8px; background: #dc2626; color: #fff; font-size: .7rem; font-weight: 800; min-width: 20px; height: 20px; border-radius: 10px; display: flex; align-items: center; justify-content: center; padding: 0 5px; line-height: 1; }
 
     .lp-num { font-family: 'Bricolage Grotesque', sans-serif; font-size: .72rem; font-weight: 700; letter-spacing: .1em; }
     .lp-card.c-blue   .lp-num { color: #0075ab; }
@@ -290,6 +294,7 @@
     .lp-card.c-orange .lp-num { color: #ea580c; }
     .lp-card.c-purple .lp-num { color: #7c3aed; }
     .lp-card.c-teal   .lp-num { color: #0d9488; }
+    .lp-card.c-red    .lp-num { color: #dc2626; }
 
     /* ── Module 5 - Goods In ── */
     .gi-po-card { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; background: var(--bg); transition: box-shadow .15s; margin-bottom: 8px; }
@@ -611,8 +616,9 @@
     delivery:   { main: '#ea580c', dark: '#c2410c', light: '#fed7aa', faint: '#fff7ed' },
     stock:      { main: '#7c3aed', dark: '#6d28d9', light: '#ede9fe', faint: '#faf5ff' },
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
+    remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.10.3';
+  const VERSION = 'v2.11.0';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -620,6 +626,7 @@
     delivery: 'Driver Delivery · ' + VERSION,
     stock: 'Stock Checker · ' + VERSION,
     goodsin: 'Goods In · ' + VERSION,
+    remedial: 'Remedial Deliveries · ' + VERSION,
   };
 
   function applyTheme(mod) {
@@ -668,6 +675,7 @@
     c4: { screen: 'overview', subCat: null },
     /* module 5 - goods in */
     c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null },
+    c6: { items: [], loading: false, badgeCount: 0 },
     /* home dashboard */
     dash: { loading: true, m1: [], m2: [], m3: [], m5: [] },
     dashUnlocked: false,
@@ -723,6 +731,8 @@
     else if (v === 'c2-jobs')  root.innerHTML = renderC2Jobs();
     else if (v === 'c2-pick')  root.innerHTML = renderC2Pick();
     else if (v === 'c2-done')  root.innerHTML = renderC2Done();
+    else if (v === 'c6-list')  root.innerHTML = renderC6List();
+    else if (v === 'c6-detail') root.innerHTML = renderC6Detail();
     else if (v === 'c3-home')  root.innerHTML = renderC3Home();
     else if (v === 'c3-check')   root.innerHTML = renderC3Check();
     else if (v === 'c3-signoff') root.innerHTML = renderC3Signoff();
@@ -755,6 +765,7 @@
     const h = new Date().getHours();
     const greet = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
     if (state.dashUnlocked) setTimeout(loadDashboard, 0);
+    loadC6BadgeCount().then(render);
     setTimeout(startSnake, 80);
     const ic = {
       list: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><line x1="12" x2="16" y1="11" y2="11"/><line x1="8" x2="8.01" y1="11" y2="11"/><line x1="12" x2="16" y1="16" y2="16"/><line x1="8" x2="8.01" y1="16" y2="16"/></svg>`,
@@ -799,6 +810,13 @@
           <span class="lp-name">Goods In</span>
           <span class="lp-desc">Receive deliveries and collections against purchase orders.</span>
           <span class="lp-glyph" style="color:#0d9488;">${ic.inbox}</span>
+        </button>
+        <button class="lp-card c-red" data-action="open-module" data-mod="remedial">
+          ${state.c6.badgeCount > 0 ? `<span class="lp-badge">${state.c6.badgeCount}</span>` : ''}
+          <span class="lp-num">06</span>
+          <span class="lp-name">Remedials</span>
+          <span class="lp-desc">Outstanding remedial deliveries ready to pick and pack.</span>
+          <span class="lp-glyph" style="color:#dc2626;">${ic.truck}</span>
         </button>
       </div>
       <div class="dash-wrap">
@@ -2408,6 +2426,7 @@
       if (mod === 'completion') { state.view = 'c2-home'; }
       if (mod === 'delivery')   { state.view = 'c3-home'; }
       if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadWallPanels(), loadC4EOLItems()]).then(render); }
+      if (mod === 'remedial')   { state.module = 'remedial'; state.view = 'c6-list'; applyTheme('remedial'); loadC6Remedials().then(render); render(); return; }
       if (mod === 'goodsin')    {
         state.module = 'goodsin'; state.view = 'c5-list';
         state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null };
@@ -2948,6 +2967,18 @@
     if (action === 'c2-select-job') { state.c2.selectedJob = btn.dataset.job; state.view = 'c2-pick'; render(); return; }
     if (action === 'c2-back-jobs')  { state.view = 'c2-jobs'; render(); return; }
     if (action === 'c2-submit')     { submitC2Picks(); return; }
+    if (action === 'c6-mark-ready') {
+      const id = btn.dataset.id;
+      if (id) markRemedialReady(id);
+      return;
+    }
+    if (action === 'c6-mark-complete') {
+      const id = btn.dataset.id;
+      if (!id) return;
+      if (!confirm('Mark this item as picked and packed?')) return;
+      markRemedialComplete(id);
+      return;
+    }
     if (action === 'c2-copy-short') { copyC2Shortfall(); return; }
 
     /* ── module 3 ── */
@@ -4346,6 +4377,23 @@
     if (!state.c2.picks[jobRef]) state.c2.picks[jobRef] = {};
     rows.forEach(r => { state.c2.picks[jobRef][r.item_key] = { qty: r.picked_qty }; });
 
+    /* auto-create remedial rows for any shortfall items */
+    const shortRows = rows.filter(r => r.shortfall > 0);
+    if (shortRows.length) {
+      const remedialRows = shortRows.map(r => ({
+        session_id:   s.id,
+        job_ref:      r.job_ref,
+        item_key:     r.item_key,
+        item_name:    r.item_name,
+        shortfall_qty: r.shortfall,
+        status:       'pending',
+        created_at:   new Date().toISOString(),
+      }));
+      /* delete any existing pending remedials for this job first to avoid dupes */
+      await sb.from('remedials').delete().eq('session_id', s.id).eq('job_ref', jobRef).eq('status', 'pending');
+      await sb.from('remedials').insert(remedialRows);
+    }
+
     state.view = 'c2-done'; render();
   }
 
@@ -4374,6 +4422,102 @@
     ];
     navigator.clipboard.writeText(lines.join('\n')).then(() => toast('Shortfall copied!'));
   }
+  /* ═════════════════════════════════════════════
+     MODULE 6 - REMEDIAL DELIVERIES
+  ═════════════════════════════════════════════ */
+
+  async function loadC6Remedials() {
+    state.c6.loading = true;
+    const { data, error } = await sb.from('remedials')
+      .select('*')
+      .in('status', ['pending', 'ready'])
+      .order('created_at', { ascending: false });
+    if (error) { console.error('C6 load error:', error); state.c6.loading = false; return; }
+    state.c6.items = data || [];
+    state.c6.badgeCount = (data || []).filter(r => r.status === 'ready').length;
+    state.c6.loading = false;
+  }
+
+  async function loadC6BadgeCount() {
+    const { count } = await sb.from('remedials')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'ready');
+    state.c6.badgeCount = count || 0;
+  }
+
+  async function markRemedialReady(id) {
+    const { error } = await sb.from('remedials').update({ status: 'ready', actioned_at: new Date().toISOString() }).eq('id', id);
+    if (error) { toast('Failed to update: ' + (error.message || 'unknown error')); return; }
+    await loadC6Remedials();
+    render();
+  }
+
+  async function markRemedialComplete(id) {
+    const { error } = await sb.from('remedials').update({ status: 'complete', completed_at: new Date().toISOString() }).eq('id', id);
+    if (error) { toast('Failed to update: ' + (error.message || 'unknown error')); return; }
+    const item = state.c6.items.find(r => r.id === id);
+    if (item) {
+      await sb.from('deliveries').insert({
+        session_id:    item.session_id,
+        job_ref:       item.job_ref,
+        item_key:      item.item_key,
+        item_name:     item.item_name,
+        picked_qty:    item.shortfall_qty,
+        delivered_qty: item.shortfall_qty,
+        shortfall:     0,
+        notes:         'Remedial delivery',
+        created_at:    new Date().toISOString(),
+        updated_at:    new Date().toISOString(),
+      });
+    }
+    await loadC6Remedials();
+    render();
+  }
+
+  function renderC6List() {
+    const items = state.c6.items;
+    if (state.c6.loading) return '<div class="card"><div class="text-muted text-sm">Loading remedials...</div></div>';
+
+    const pending = items.filter(r => r.status === 'pending');
+    const ready   = items.filter(r => r.status === 'ready');
+
+    const renderItem = (r, showReadyBtn) => {
+      const jobDisplay = displayJobRef(r.job_ref || '');
+      return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 0;border-bottom:1px solid var(--border);">'
+        + '<div>'
+        + '<div style="font-weight:600;font-size:.92rem;">' + esc(r.item_name || r.item_key) + '</div>'
+        + '<div style="font-size:.78rem;color:var(--muted);margin-top:2px;">Job ' + esc(jobDisplay) + ' &middot; Qty ' + r.shortfall_qty + '</div>'
+        + '</div>'
+        + (showReadyBtn
+            ? '<button class="btn btn-sm" style="background:var(--teal);color:#fff;white-space:nowrap;flex-shrink:0;" data-action="c6-mark-ready" data-id="' + r.id + '">Mark ready</button>'
+            : '<button class="btn btn-sm" style="background:#059669;color:#fff;white-space:nowrap;flex-shrink:0;" data-action="c6-mark-complete" data-id="' + r.id + '">Picked &amp; packed</button>'
+          )
+        + '</div>';
+    };
+
+    const readyHtml = ready.length
+      ? ready.map(r => renderItem(r, false)).join('')
+      : '<div class="text-muted text-sm" style="padding:12px 0;">No remedials ready to pick.</div>';
+
+    const pendingHtml = pending.length
+      ? pending.map(r => renderItem(r, true)).join('')
+      : '<div class="text-muted text-sm" style="padding:12px 0;">No pending remedials.</div>';
+
+    return '<div class="module-wrap">'
+      + '<button class="btn btn-ghost back-btn" data-action="go-home">&#8592; Home</button>'
+      + '<h2 class="module-title">Remedial Deliveries</h2>'
+      + '<div class="card" style="margin-bottom:14px;">'
+      + '<div style="font-family:Bricolage Grotesque,sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px;">Ready to pick</div>'
+      + readyHtml
+      + '</div>'
+      + '<div class="card">'
+      + '<div style="font-family:Bricolage Grotesque,sans-serif;font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:8px;">Pending (packing slip not yet made)</div>'
+      + pendingHtml
+      + '</div>'
+      + '</div>';
+  }
+
+
 
   /* ═══════════════════════════════════════════════
      SUPABASE - M3 driver delivery
