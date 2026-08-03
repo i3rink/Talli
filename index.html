@@ -1,4 +1,4 @@
-<!-- Talli v2.12.0 - deployed 03 Aug 2026 -->
+<!-- Talli v2.12.1 - deployed 03 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -617,7 +617,7 @@
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.12.0';
+  const VERSION = 'v2.12.1';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -2970,7 +2970,16 @@
     if (action === 'dash-raise-order') {
       const job = btn.dataset.job;
       if (!job) return;
-      const poRef = prompt('Enter the Moon Invoice PO number for job ' + job.replace(/^Q/i,'') + ':');
+      if (!state.dashMoonOpened) state.dashMoonOpened = {};
+      state.dashMoonOpened[job] = true;
+      window.open('https://app.mooninvoice.com', '_blank');
+      render();
+      return;
+    }
+    if (action === 'dash-confirm-po') {
+      const job = btn.dataset.job;
+      if (!job) return;
+      const poRef = prompt('Enter the PO number from Moon Invoice for job ' + job.replace(/^Q/i,'') + ':');
       if (!poRef || !poRef.trim()) return;
       const cleanPO = poRef.trim();
       (async () => {
@@ -2978,7 +2987,7 @@
         const { data: existing } = await sb.from('remedials')
           .select('id').eq('job_ref', job).eq('status', 'pending');
         if (!existing || !existing.length) {
-          /* no pending rows — could be first raise after a check; create from deliveries shortfall */
+          /* no pending rows — create from deliveries shortfall */
           const { data: rows } = await sb.from('deliveries')
             .select('*').eq('job_ref', job).gt('shortfall', 0);
           if (!rows || !rows.length) { toast('No shortfall items found for job ' + job.replace(/^Q/i,'')); return; }
@@ -3004,9 +3013,8 @@
         }
         if (!state.dashRemedialPORefs) state.dashRemedialPORefs = {};
         state.dashRemedialPORefs[job] = cleanPO;
-        /* open Moon Invoice in new tab */
-        window.open('https://app.mooninvoice.com', '_blank');
-        toast('Order raised — PO ' + cleanPO + ' recorded');
+        if (state.dashMoonOpened) delete state.dashMoonOpened[job];
+        toast('PO ' + cleanPO + ' confirmed');
         render();
       })();
       return;
@@ -4141,6 +4149,7 @@
             <span class="dash-item-short">Short ${i.shortfall}</span>
           </div>`).join('');
         const job_poRef = state.dashRemedialPORefs ? (state.dashRemedialPORefs[job] || '') : '';
+        const job_moonOpened = state.dashMoonOpened ? !!state.dashMoonOpened[job] : false;
         return `
           <div class="dash-session">
             <div class="dash-session-head" data-action="dash-expand" data-key="${esc(key)}">
@@ -4148,7 +4157,9 @@
               <div class="dash-session-meta">${items.length} item${items.length !== 1 ? 's' : ''}</div>
               ${job_poRef
   ? `<span style="font-size:.72rem;background:#d1fae5;color:#065f46;padding:3px 8px;border-radius:6px;white-space:nowrap;">PO ${esc(job_poRef)} raised</span>`
-  : `<button class="btn btn-sm" style="background:#0075ab;color:#fff;font-size:.75rem;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;" data-action="dash-raise-order" data-job="${esc(job)}" title="Raise a PO for these items">Raise order</button>`
+  : job_moonOpened
+    ? `<button class="btn btn-sm" style="background:#059669;color:#fff;font-size:.75rem;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;" data-action="dash-confirm-po" data-job="${esc(job)}" title="Enter the PO number from Moon Invoice">Confirm PO number</button>`
+    : `<button class="btn btn-sm" style="background:#0075ab;color:#fff;font-size:.75rem;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;" data-action="dash-raise-order" data-job="${esc(job)}" title="Open Moon Invoice to raise a PO">Raise order</button>`
 }
               <button class="dash-archive-btn" data-action="dash-archive-m3" data-job="${esc(job)}" title="Mark job as complete">Archive</button>
               <div class="dash-session-chevron ${isOpen ? 'open' : ''}" data-key="${esc(key)}">&#9658;</div>
