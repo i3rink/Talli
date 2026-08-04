@@ -1,4 +1,4 @@
-<!-- Talli v2.12.2 - deployed 03 Aug 2026 -->
+<!-- Talli v2.13.0 - deployed 04 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.12.2';
+const APP_VERSION = 'v2.13.0';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v2.12.2';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.12.2';
+  const VERSION = 'v2.13.0';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -674,7 +674,8 @@ const APP_VERSION = 'v2.12.2';
     /* module 4 - stock checker */
     c4: { screen: 'overview', subCat: null },
     /* module 5 - goods in */
-    c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null },
+    c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null, isRemedialPO: false, remedialMatchError: null },
+    adhocRemedial: { open: false, jobRef: '', itemName: '', qty: '', reason: 'damaged_delivery', submitting: false },
     c6: { items: [], loading: false, badgeCount: 0 },
     /* home dashboard */
     dash: { loading: true, m1: [], m2: [], m3: [], m5: [] },
@@ -2430,7 +2431,7 @@ const APP_VERSION = 'v2.12.2';
       if (mod === 'remedial')   { state.module = 'remedial'; state.view = 'c6-list'; applyTheme('remedial'); loadC6Remedials().then(render); render(); return; }
       if (mod === 'goodsin')    {
         state.module = 'goodsin'; state.view = 'c5-list';
-        state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null };
+        state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null, isRemedialPO: false, remedialMatchError: null };
         render(); loadC5POs(); return;
       }
       render(); return;
@@ -2684,7 +2685,7 @@ const APP_VERSION = 'v2.12.2';
       state.alternatives = {};
       state.driveFileDocs = [];
       state.appendTarget = null;
-      state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null };
+      state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null, isRemedialPO: false, remedialMatchError: null };
       state.dash = { loading: true, m1: [], m2: [], m3: [], m5: [] };
       render(); return;
     }
@@ -2977,14 +2978,35 @@ const APP_VERSION = 'v2.12.2';
       render();
       return;
     }
+    if (action === 'dash-rem-type') {
+      const job = btn.dataset.job;
+      const remtype = btn.dataset.remtype;
+      if (!job || !remtype) return;
+      if (!state.dashRemedialType) state.dashRemedialType = {};
+      state.dashRemedialType[job] = remtype;
+      render();
+      return;
+    }
+
+    if (action === 'dash-adhoc-remedial') {
+      state.adhocRemedial = { open: true, jobRef: '', itemName: '', qty: '', reason: 'damaged_delivery', submitting: false };
+      showAdhocRemedialModal();
+      return;
+    }
+
     if (action === 'dash-confirm-po') {
       const job = btn.dataset.job;
       if (!job) return;
+      const remedialType = btn.dataset.remtype || 'delivery';
       const poRef = prompt('Enter the PO number from Moon Invoice for job ' + job.replace(/^Q/i,'') + ':');
       if (!poRef || !poRef.trim()) return;
       const cleanPO = poRef.trim();
+      /* Normalise for storage — uppercase, no leading/trailing spaces */
+      const normPO = cleanPO.toUpperCase().replace(/\s+/g, '');
+      /* Collection remedials skip Goods In wait — go straight to ready */
+      const newStatus = remedialType === 'collection' ? 'ready' : 'ordered';
       (async () => {
-        /* flip existing pending remedials for this job to ordered, store po_ref */
+        /* flip existing pending remedials for this job to ordered/ready, store po_ref */
         const { data: existing } = await sb.from('remedials')
           .select('id').eq('job_ref', job).eq('status', 'pending');
         if (!existing || !existing.length) {
@@ -2999,8 +3021,10 @@ const APP_VERSION = 'v2.12.2';
             item_key:      r.item_key,
             item_name:     r.item_name,
             shortfall_qty: r.shortfall,
-            status:        'ordered',
-            po_ref:        cleanPO,
+            status:        newStatus,
+            po_ref:        normPO,
+            remedial_type: remedialType,
+            source:        'm2_shortfall',
             ordered_at:    new Date().toISOString(),
             created_at:    new Date().toISOString(),
           }));
@@ -3008,14 +3032,19 @@ const APP_VERSION = 'v2.12.2';
           if (error) { toast('Failed: ' + (error.message || 'unknown')); return; }
         } else {
           const { error } = await sb.from('remedials')
-            .update({ status: 'ordered', po_ref: cleanPO, ordered_at: new Date().toISOString() })
+            .update({ status: newStatus, po_ref: normPO, remedial_type: remedialType, ordered_at: new Date().toISOString() })
             .eq('job_ref', job).eq('status', 'pending');
           if (error) { toast('Failed: ' + (error.message || 'unknown')); return; }
         }
         if (!state.dashRemedialPORefs) state.dashRemedialPORefs = {};
         state.dashRemedialPORefs[job] = cleanPO;
         if (state.dashMoonOpened) delete state.dashMoonOpened[job];
-        toast('PO ' + cleanPO + ' confirmed');
+        if (remedialType === 'collection') {
+          await loadC6BadgeCount();
+          toast('PO ' + cleanPO + ' confirmed — collection remedial sent to warehouse');
+        } else {
+          toast('PO ' + cleanPO + ' confirmed — waiting for Goods In');
+        }
         render();
       })();
       return;
@@ -4159,13 +4188,27 @@ const APP_VERSION = 'v2.12.2';
               ${job_poRef
   ? `<span style="font-size:.72rem;background:#d1fae5;color:#065f46;padding:3px 8px;border-radius:6px;white-space:nowrap;">PO ${esc(job_poRef)} raised</span>`
   : job_moonOpened
-    ? `<button class="btn btn-sm" style="background:#059669;color:#fff;font-size:.75rem;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;" data-action="dash-confirm-po" data-job="${esc(job)}" title="Enter the PO number from Moon Invoice">Confirm PO number</button>`
+    ? `<button class="btn btn-sm" style="background:#059669;color:#fff;font-size:.75rem;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;" data-action="dash-confirm-po" data-job="${esc(job)}" data-remtype="${state.dashRemedialType && state.dashRemedialType[job] === 'collection' ? 'collection' : 'delivery'}" title="Enter the PO number from Moon Invoice">Confirm PO number</button>`
     : `<button class="btn btn-sm" style="background:#0075ab;color:#fff;font-size:.75rem;padding:4px 10px;border-radius:6px;border:none;cursor:pointer;white-space:nowrap;" data-action="dash-raise-order" data-job="${esc(job)}" title="Open Moon Invoice to raise a PO">Raise order</button>`
 }
               <button class="dash-archive-btn" data-action="dash-archive-m3" data-job="${esc(job)}" title="Mark job as complete">Archive</button>
               <div class="dash-session-chevron ${isOpen ? 'open' : ''}" data-key="${esc(key)}">&#9658;</div>
             </div>
-            <div class="dash-session-body ${isOpen ? 'open' : ''}" data-key="${esc(key)}">${itemRows}</div>
+            <div class="dash-session-body ${isOpen ? 'open' : ''}" data-key="${esc(key)}">
+              ${itemRows}
+              ${!job_poRef ? `
+              <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);">
+                <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;font-weight:600;">Remedial type</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                  <button class="gi-status-btn ${!(state.dashRemedialType && state.dashRemedialType[job] === 'collection') ? 'active-ok' : ''}"
+                    data-action="dash-rem-type" data-job="${esc(job)}" data-remtype="delivery"
+                    style="font-size:.78rem;padding:5px 12px;">&#128666; Delivery</button>
+                  <button class="gi-status-btn ${state.dashRemedialType && state.dashRemedialType[job] === 'collection' ? 'active-ok' : ''}"
+                    data-action="dash-rem-type" data-job="${esc(job)}" data-remtype="collection"
+                    style="font-size:.78rem;padding:5px 12px;">&#128230; Collection</button>
+                </div>
+              </div>` : ''}
+            </div>
           </div>`;
       }).join('');
 
@@ -4178,7 +4221,12 @@ const APP_VERSION = 'v2.12.2';
         </div>
         <div class="dash-module-body${state.dashModuleExpanded.m3 ? ' open' : ''}" data-module="m3">
         ${jobBlocks}
-
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border);">
+          <button class="btn btn-ghost" data-action="dash-adhoc-remedial"
+            style="width:100%;font-size:.82rem;color:#475569;border-color:#cbd5e1;">
+            + Raise ad hoc remedial
+          </button>
+        </div>
         </div>
       </div>`;
     }
@@ -4496,6 +4544,102 @@ const APP_VERSION = 'v2.12.2';
      MODULE 6 - REMEDIAL DELIVERIES
   ═════════════════════════════════════════════ */
 
+  /* ── Ad hoc remedial modal ── */
+  function showAdhocRemedialModal() {
+    /* Remove any existing modal */
+    const existing = document.getElementById('adhoc-modal');
+    if (existing) existing.remove();
+
+    const overlay = document.createElement('div');
+    overlay.id = 'adhoc-modal';
+    overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:9000;display:flex;align-items:center;justify-content:center;padding:16px;';
+
+    overlay.innerHTML = `
+      <div style="background:var(--surface);border-radius:16px;width:100%;max-width:440px;padding:24px;box-shadow:0 8px 32px rgba(0,0,0,.2);">
+        <div style="font-size:1.05rem;font-weight:700;margin-bottom:4px;color:var(--text);">Raise ad hoc remedial</div>
+        <div style="font-size:.82rem;color:var(--muted);margin-bottom:18px;">Use this for damage or missing items spotted during delivery or by the fitters.</div>
+
+        <div style="font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:6px;">Job reference <span style="color:#b91c1c;">*</span></div>
+        <input id="adhoc-job" class="text-input" type="text" placeholder="e.g. 1785"
+          style="width:100%;margin-bottom:14px;" value="${esc(state.adhocRemedial.jobRef)}" />
+
+        <div style="font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:6px;">Item description <span style="color:#b91c1c;">*</span></div>
+        <input id="adhoc-item" class="text-input" type="text" placeholder="e.g. Carron Status bath 1700mm"
+          style="width:100%;margin-bottom:14px;" value="${esc(state.adhocRemedial.itemName)}" />
+
+        <div style="font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:6px;">Quantity <span style="color:#b91c1c;">*</span></div>
+        <input id="adhoc-qty" class="text-input" type="number" min="1" placeholder="1"
+          style="width:100%;margin-bottom:14px;" value="${esc(state.adhocRemedial.qty)}" />
+
+        <div style="font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:6px;">Reason <span style="color:#b91c1c;">*</span></div>
+        <select id="adhoc-reason" class="text-input" style="width:100%;margin-bottom:20px;">
+          <option value="damaged_delivery" ${state.adhocRemedial.reason === 'damaged_delivery' ? 'selected' : ''}>Damaged on delivery</option>
+          <option value="missing_delivery" ${state.adhocRemedial.reason === 'missing_delivery' ? 'selected' : ''}>Missing from delivery</option>
+          <option value="damaged_site" ${state.adhocRemedial.reason === 'damaged_site' ? 'selected' : ''}>Damaged on site (fitter)</option>
+          <option value="other" ${state.adhocRemedial.reason === 'other' ? 'selected' : ''}>Other</option>
+        </select>
+
+        <div id="adhoc-error" style="display:none;color:#b91c1c;font-size:.82rem;margin-bottom:12px;background:#fee2e2;padding:8px 12px;border-radius:8px;"></div>
+
+        <div style="display:flex;gap:10px;">
+          <button id="adhoc-cancel" class="btn btn-ghost" style="flex:1;">Cancel</button>
+          <button id="adhoc-submit" class="btn btn-primary" style="flex:2;">Raise remedial</button>
+        </div>
+      </div>`;
+
+    document.body.appendChild(overlay);
+
+    document.getElementById('adhoc-cancel').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+
+    document.getElementById('adhoc-submit').addEventListener('click', async () => {
+      const jobRef   = document.getElementById('adhoc-job').value.trim().replace(/^Q/i, '');
+      const itemName = document.getElementById('adhoc-item').value.trim();
+      const qty      = parseFloat(document.getElementById('adhoc-qty').value);
+      const reason   = document.getElementById('adhoc-reason').value;
+      const errEl    = document.getElementById('adhoc-error');
+
+      if (!jobRef)        { errEl.textContent = 'Enter a job reference.'; errEl.style.display = 'block'; return; }
+      if (!itemName)      { errEl.textContent = 'Enter an item description.'; errEl.style.display = 'block'; return; }
+      if (!qty || qty < 1){ errEl.textContent = 'Enter a valid quantity.'; errEl.style.display = 'block'; return; }
+      errEl.style.display = 'none';
+
+      /* Advisory check — does this job ref exist in sessions? */
+      const { data: sessionCheck } = await sb.from('sessions').select('id').ilike('code', '%' + jobRef + '%').limit(1);
+      if (!sessionCheck || !sessionCheck.length) {
+        const proceed = confirm('No Talli session found for job ' + jobRef + '. Are you sure the reference is correct? You can still raise the remedial.');
+        if (!proceed) return;
+      }
+
+      const submitBtn = document.getElementById('adhoc-submit');
+      submitBtn.textContent = 'Saving...';
+      submitBtn.disabled = true;
+
+      const { error } = await sb.from('remedials').insert({
+        job_ref:       jobRef,
+        item_key:      'adhoc-' + Date.now(),
+        item_name:     itemName,
+        shortfall_qty: qty,
+        status:        'pending',
+        source:        'adhoc',
+        remedial_type: 'delivery',
+        created_at:    new Date().toISOString(),
+      });
+
+      if (error) {
+        errEl.textContent = 'Save failed: ' + (error.message || 'unknown error');
+        errEl.style.display = 'block';
+        submitBtn.textContent = 'Raise remedial';
+        submitBtn.disabled = false;
+        return;
+      }
+
+      overlay.remove();
+      toast('Ad hoc remedial raised for job ' + jobRef);
+      render();
+    });
+  }
+
   async function loadC6Remedials() {
     state.c6.loading = true;
     const { data, error } = await sb.from('remedials')
@@ -4555,10 +4699,14 @@ const APP_VERSION = 'v2.12.2';
     const renderItem = r => {
       const jobDisplay = displayJobRef(r.job_ref || '');
       const name = (r.item_name && r.item_name.trim() && r.item_name !== '.') ? r.item_name : (r.item_key || 'Item');
+      const isCollection = r.remedial_type === 'collection';
+      const typeLabel = isCollection
+        ? '<span style="font-size:.7rem;background:#dbeafe;color:#1e40af;padding:1px 6px;border-radius:4px;font-weight:600;margin-left:6px;">COLLECTION</span>'
+        : '<span style="font-size:.7rem;background:#d1fae5;color:#065f46;padding:1px 6px;border-radius:4px;font-weight:600;margin-left:6px;">DELIVERY</span>';
       return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:14px 0;border-bottom:1px solid var(--border);">'
         + '<div>'
-        + '<div style="font-weight:600;font-size:.95rem;">' + esc(name) + '</div>'
-        + '<div style="font-size:.8rem;color:var(--muted);margin-top:3px;">Job ' + esc(jobDisplay) + ' &middot; Qty ' + r.shortfall_qty + '</div>'
+        + '<div style="font-weight:600;font-size:.95rem;">' + esc(name) + typeLabel + '</div>'
+        + '<div style="font-size:.8rem;color:var(--muted);margin-top:3px;">Job ' + esc(jobDisplay) + ' &middot; Qty ' + r.shortfall_qty + (r.source === 'adhoc' ? ' &middot; Ad hoc' : '') + '</div>'
         + '</div>'
         + '<button class="btn btn-sm" style="background:#059669;color:#fff;white-space:nowrap;flex-shrink:0;padding:8px 14px;" data-action="c6-mark-complete" data-id="' + r.id + '">Picked &amp; packed</button>'
         + '</div>';
@@ -4879,11 +5027,14 @@ const APP_VERSION = 'v2.12.2';
     const { po } = state.c5;
     if (!po) return;
 
+    const normPoNum = (po.poNumber || '').toUpperCase().replace(/\s+/g, '');
     const { data: poRow, error: poErr } = await sb.from('goods_in_pos').upsert({
-      po_number: po.poNumber,
-      supplier:  po.supplier,
-      po_date:   po.poDate || null,
-      status:    'pending',
+      po_number:       po.poNumber,
+      supplier:        po.supplier,
+      po_date:         po.poDate || null,
+      status:          'pending',
+      is_remedial:     state.c5.isRemedialPO || false,
+      remedial_po_ref: state.c5.isRemedialPO ? normPoNum : null,
     }, { onConflict: 'po_number' }).select().single();
     if (poErr) { toast('Save failed — check connection'); console.error(poErr); return; }
 
@@ -4940,16 +5091,15 @@ const APP_VERSION = 'v2.12.2';
       }).eq('id', line.id);
     }
 
-    /* automatch: flip any ordered remedials with matching po_ref to ready */
-    const savedPoNumber = activePo.po_number || '';
-    if (savedPoNumber) {
-      const normalise = s => s.replace(/^(PO|#|\s)+/i, '').replace(/\s+/g, '').toLowerCase();
-      const normSaved = normalise(savedPoNumber);
+    /* automatch: only attempt if this PO was flagged as a remedial PO */
+    if (activePo.is_remedial && activePo.remedial_po_ref) {
+      const normSaved = activePo.remedial_po_ref; /* already normalised on save */
       const { data: matchedRemedials } = await sb.from('remedials')
         .select('id, po_ref').eq('status', 'ordered').not('po_ref', 'is', null);
       if (matchedRemedials && matchedRemedials.length) {
+        const normalise = s => (s || '').toUpperCase().replace(/\s+/g, '');
         const matchIds = matchedRemedials
-          .filter(r => normalise(r.po_ref || '') === normSaved)
+          .filter(r => normalise(r.po_ref) === normSaved)
           .map(r => r.id);
         if (matchIds.length) {
           await sb.from('remedials')
@@ -4958,10 +5108,15 @@ const APP_VERSION = 'v2.12.2';
           await loadC6BadgeCount();
           toast('Receipt recorded — ' + matchIds.length + ' remedial item' + (matchIds.length !== 1 ? 's' : '') + ' ready to pick');
         } else {
-          toast('Receipt recorded — no matching remedial PO found');
+          /* Flagged as remedial but no match found — loud failure */
+          toast('&#9888; Receipt saved but no remedial found for PO ' + (activePo.po_number || '') + '. Check the PO number is correct.');
+          /* Also show persistent warning on the complete screen */
+          state.c5.remedialMatchError = 'No remedial order found matching PO ' + (activePo.po_number || '') + '. Check the PO number entered on the remedial matches exactly.';
         }
       } else {
-        toast('Receipt recorded');
+        /* No ordered remedials at all — still flag it */
+        toast('&#9888; Receipt saved — no remedial orders are currently waiting for this PO. Check the PO number.');
+        state.c5.remedialMatchError = 'No remedial orders found waiting for PO ' + (activePo.po_number || '') + '. Check with Rab that the PO was raised correctly.';
       }
     } else {
       toast('Receipt recorded');
@@ -5056,7 +5211,24 @@ const APP_VERSION = 'v2.12.2';
         <p class="text-muted text-sm" style="margin-bottom:0;">${(po.items || []).length} line item${(po.items || []).length !== 1 ? 's' : ''} parsed from PDF</p>
       </div>
       ${lineRows}
-      <button class="btn btn-primary" data-action="gi-save-pending" style="width:100%;margin-top:8px;">
+      <div style="margin-top:16px;padding:14px;background:var(--bg);border-radius:12px;border:1px solid var(--border);">
+        <div style="font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:8px;">Is this a remedial PO?</div>
+        <div style="display:flex;gap:8px;margin-bottom:${state.c5.isRemedialPO ? '12px' : '0'};">
+          <button class="gi-status-btn ${!state.c5.isRemedialPO ? 'active-ok' : ''}"
+            data-action="gi-remedial-po-toggle" data-val="no"
+            style="font-size:.78rem;padding:5px 12px;">No — standard PO</button>
+          <button class="gi-status-btn ${state.c5.isRemedialPO ? 'active-ok' : ''}"
+            data-action="gi-remedial-po-toggle" data-val="yes"
+            style="font-size:.78rem;padding:5px 12px;">Yes — remedial PO</button>
+        </div>
+        ${state.c5.isRemedialPO ? `
+        <div style="font-size:.78rem;color:var(--muted);">When received in Goods In, this PO will automatically match to the remedial and send items to the warehouse queue.</div>` : ''}
+      </div>
+      ${state.c5.remedialMatchError ? `
+      <div style="margin-top:10px;background:#fee2e2;color:#991b1b;padding:10px 14px;border-radius:10px;font-size:.82rem;">
+        &#9888; ${esc(state.c5.remedialMatchError)}
+      </div>` : ''}
+      <button class="btn btn-primary" data-action="gi-save-pending" style="width:100%;margin-top:12px;">
         Save PO &#8594;
       </button>`;
   }
@@ -5205,6 +5377,13 @@ const APP_VERSION = 'v2.12.2';
   /* ── Goods In action handlers ── */
   function bindC5Events(action, btn, e) {
     if (action === 'gi-file-pick') return;
+
+    if (action === 'gi-remedial-po-toggle') {
+      state.c5.isRemedialPO = btn.dataset.val === 'yes';
+      state.c5.remedialMatchError = null;
+      render();
+      return;
+    }
 
     if (action === 'gi-save-pending') {
       savePOPending(); return true;
