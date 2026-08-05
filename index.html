@@ -1,4 +1,4 @@
-<!-- Talli v2.13.0 - deployed 04 Aug 2026 -->
+<!-- Talli v2.14.0 - deployed 05 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.13.0';
+const APP_VERSION = 'v2.14.0';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v2.13.0';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.13.0';
+  const VERSION = 'v2.14.0';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -674,7 +674,8 @@ const APP_VERSION = 'v2.13.0';
     /* module 4 - stock checker */
     c4: { screen: 'overview', subCat: null },
     /* module 5 - goods in */
-    c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null, isRemedialPO: false, remedialMatchError: null },
+    c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null, isRemedialPO: false, remedialMatchError: null, tab: 'in' },
+    c5out: { orders: [], loading: false, badgeCount: 0, activeOrder: null, activeLines: [], uploadError: null, po: null },
     adhocRemedial: { open: false, jobRef: '', itemName: '', qty: '', reason: 'damaged_delivery', submitting: false },
     c6: { items: [], loading: false, badgeCount: 0 },
     /* home dashboard */
@@ -743,6 +744,11 @@ const APP_VERSION = 'v2.13.0';
     else if (v === 'c4-eol')       root.innerHTML = renderC4EOL();
     else if (v === 'c4-showroom')  root.innerHTML = renderC4Showroom();
     else if (v === 'c5-list')      root.innerHTML = renderC5List();
+    else if (v === 'c5out-list')    root.innerHTML = renderC5OutList();
+    else if (v === 'c5out-upload')  root.innerHTML = renderC5OutUpload();
+    else if (v === 'c5out-preview') root.innerHTML = renderC5OutPreview();
+    else if (v === 'c5out-staged')  root.innerHTML = renderC5OutStaged();
+    else if (v === 'c5out-signoff') root.innerHTML = renderC5OutSignoff();
     else if (v === 'c5-preview')   root.innerHTML = renderC5Preview();
     else if (v === 'c5-upload')    root.innerHTML = renderC5Upload();
     else if (v === 'c5-receive')   root.innerHTML = renderC5Receive();
@@ -767,6 +773,7 @@ const APP_VERSION = 'v2.13.0';
     const greet = h < 12 ? 'morning' : h < 17 ? 'afternoon' : 'evening';
     if (state.dashUnlocked) setTimeout(loadDashboard, 0);
     loadC6BadgeCount();
+    loadC5OutBadgeCount();
     setTimeout(startSnake, 80);
     const ic = {
       list: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><line x1="12" x2="16" y1="11" y2="11"/><line x1="8" x2="8.01" y1="11" y2="11"/><line x1="12" x2="16" y1="16" y2="16"/><line x1="8" x2="8.01" y1="16" y2="16"/></svg>`,
@@ -807,11 +814,12 @@ const APP_VERSION = 'v2.13.0';
           <span class="lp-desc">Physical counts by category, variance review, audit trail.</span>
           <span class="lp-glyph" style="color:#7c3aed;">${ic.pkg}</span>
         </button>
-        <button class="lp-card c-teal" data-action="open-module" data-mod="goodsin">
+        <button class="lp-card c-teal" data-action="open-module" data-mod="goodsin" style="position:relative;">
           <span class="lp-num">05</span>
-          <span class="lp-name">Goods In</span>
-          <span class="lp-desc">Receive deliveries and collections against purchase orders.</span>
+          <span class="lp-name">Goods In / Out</span>
+          <span class="lp-desc">Receive stock in and manage counter collections out.</span>
           <span class="lp-glyph" style="color:#0d9488;">${ic.inbox}</span>
+          ${(state.c5out.badgeCount > 0) ? `<span class="lp-badge-count">${state.c5out.badgeCount}</span>` : ''}
         </button>
         <button class="lp-card c-slate" data-action="open-module" data-mod="remedial">
           <span class="lp-num">06</span>
@@ -2409,6 +2417,7 @@ const APP_VERSION = 'v2.13.0';
     }
     /* Goods In file input */
     attachGIFileListener();
+    attachGOFileListener();
   }
 
   /* ═══════════════════════════════════════════════
@@ -2430,9 +2439,11 @@ const APP_VERSION = 'v2.13.0';
       if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadWallPanels(), loadC4EOLItems()]).then(render); }
       if (mod === 'remedial')   { state.module = 'remedial'; state.view = 'c6-list'; applyTheme('remedial'); loadC6Remedials().then(render); render(); return; }
       if (mod === 'goodsin')    {
-        state.module = 'goodsin'; state.view = 'c5-list';
-        state.c5 = { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null, isRemedialPO: false, remedialMatchError: null };
-        render(); loadC5POs(); return;
+        state.module = 'goodsin';
+        state.view = state.c5.tab === 'out' ? 'c5out-list' : 'c5-list';
+        applyTheme('goodsin');
+        if (state.c5.tab === 'out') { loadC5OutOrders().then(render); } else { render(); loadC5POs(); }
+        return;
       }
       render(); return;
     }
@@ -3120,6 +3131,8 @@ const APP_VERSION = 'v2.13.0';
 
     /* ── Module 5 - Goods In ── */
     if (bindC5Events(action, btn, e)) return;
+    /* ── Module 5 - Goods Out ── */
+    if (bindC5OutEvents(action, btn, e)) return;
   });
 
   /* ═══════════════════════════════════════════════
@@ -5157,6 +5170,16 @@ const APP_VERSION = 'v2.13.0';
 
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
+      <div style="display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid var(--border);">
+        <button class="btn" data-action="c5-tab-in"
+          style="flex:1;border-radius:0;border:none;background:#0d9488;color:#fff;font-weight:700;padding:10px;">
+          &#8595; Goods In
+        </button>
+        <button class="btn" data-action="c5-tab-out"
+          style="flex:1;border-radius:0;border:none;background:#f0fdfa;color:#0f766e;font-weight:700;padding:10px;">
+          &#8593; Goods Out
+        </button>
+      </div>
       <div class="card">
         <div class="card-title">Goods In</div>
         <p class="text-muted text-sm" style="margin-bottom:14px;">Upload a PO PDF when an order is placed. When the goods arrive, tap the PO to receive it.</p>
@@ -5491,6 +5514,475 @@ const APP_VERSION = 'v2.13.0';
         console.error('GI parse error:', err);
         state.view = 'c5-list';
         state.c5.uploadError = 'Could not read that PDF. Please try again.';
+        render();
+      }
+    });
+  }
+
+
+  /* ═══════════════════════════════════════════════
+     MODULE 5 — GOODS OUT
+  ═══════════════════════════════════════════════ */
+
+  async function loadC5OutBadgeCount() {
+    try {
+      const data = await sb(`goods_out_orders?status=in.(pending,staged)&select=id`, {});
+      state.c5out.badgeCount = (data || []).length;
+    } catch (e) {
+      state.c5out.badgeCount = 0;
+    }
+    render();
+  }
+
+  async function loadC5OutOrders() {
+    state.c5out.loading = true; render();
+    try {
+      const data = await sb(`goods_out_orders?order=created_at.desc&select=*`);
+      state.c5out.orders = data || [];
+    } catch (e) {
+      state.c5out.orders = [];
+    }
+    state.c5out.loading = false; render();
+  }
+
+  function renderC5OutList() {
+    const orders  = state.c5out.orders || [];
+    const loading = state.c5out.loading;
+    const pending = orders.filter(o => o.status === 'pending');
+    const staged  = orders.filter(o => o.status === 'staged');
+    const done    = orders.filter(o => o.status === 'complete');
+
+    const collectorBadge = t => {
+      const map = { tradesman: '#dbeafe:#1d4ed8:Tradesman', competitor: '#fef3c7:#92400e:Competitor', customer: '#dcfce7:#166534:Customer' };
+      const v = map[t] || '#f1f5f9:#475569:Unknown';
+      const [bg, col, label] = v.split(':');
+      return `<span style="background:${bg};color:${col};font-size:.68rem;font-weight:700;border-radius:20px;padding:2px 8px;letter-spacing:.04em;text-transform:uppercase;">${label}</span>`;
+    };
+
+    const renderOrderCard = (o) => {
+      const isActionable = o.status === 'pending' || o.status === 'staged';
+      const statusLabel = { pending: 'Pending pick', staged: 'Ready to collect', complete: 'Collected' }[o.status] || o.status;
+      const statusStyle = { pending: 'background:#fef3c7;color:#92400e;', staged: 'background:#dcfce7;color:#166534;', complete: 'background:#f1f5f9;color:#475569;' }[o.status] || '';
+      const date = o.collection_date ? new Date(o.collection_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
+      return `
+        <div class="gi-po-card ${isActionable ? 'gi-po-pending' : ''}"
+          ${o.status === 'pending' ? `data-action="c5out-open-stage" data-id="${esc(o.id)}"` : ''}
+          ${o.status === 'staged'  ? `data-action="c5out-open-signoff" data-id="${esc(o.id)}"` : ''}
+          style="${isActionable ? 'cursor:pointer;' : ''}">
+          <div style="flex:1;min-width:0;">
+            <div class="gi-po-num">${esc(o.invoice_ref || 'No ref')}</div>
+            <div class="gi-po-meta">
+              <div class="gi-po-supplier">${esc(o.collector_name || 'Unknown collector')}</div>
+              ${date ? `<div class="gi-po-date">${date}</div>` : ''}
+            </div>
+            <div style="margin-top:4px;">${collectorBadge(o.collector_type)}</div>
+          </div>
+          <span style="font-size:.72rem;font-weight:700;border-radius:20px;padding:3px 10px;flex-shrink:0;${statusStyle}">${statusLabel}</span>
+          <button class="btn btn-ghost" data-action="c5out-delete" data-id="${esc(o.id)}" data-ref="${esc(o.invoice_ref)}"
+            style="padding:3px 8px;font-size:.72rem;color:var(--red);border-color:var(--red);margin-left:6px;flex-shrink:0;"
+            title="Delete order">&#128465;</button>
+        </div>`;
+    };
+
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="go-home">&#8592; Back</button></div>
+      <div style="display:flex;gap:0;margin-bottom:16px;border-radius:10px;overflow:hidden;border:1px solid var(--border);">
+        <button class="btn" data-action="c5-tab-in"
+          style="flex:1;border-radius:0;border:none;background:#f0fdfa;color:#0f766e;font-weight:700;padding:10px;">
+          &#8595; Goods In
+        </button>
+        <button class="btn" data-action="c5-tab-out"
+          style="flex:1;border-radius:0;border:none;background:#0d9488;color:#fff;font-weight:700;padding:10px;">
+          &#8593; Goods Out
+        </button>
+      </div>
+      <div class="card">
+        <div class="card-title">Goods Out</div>
+        <p class="text-muted text-sm" style="margin-bottom:14px;">Upload a Moon Invoice PDF for a counter collection. The warehouse will pick and stage the order, then confirm when the customer collects.</p>
+        ${state.c5out.uploadError ? `
+          <div style="background:#fee2e2;border:1px solid #fca5a5;border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:.83rem;color:#b91c1c;line-height:1.5;">
+            &#9888; ${esc(state.c5out.uploadError)}
+          </div>` : ''}
+        <label class="btn btn-primary" style="display:block;text-align:center;cursor:pointer;">
+          &#8593; Upload Invoice PDF
+          <input type="file" id="go-file-input" accept="application/pdf" style="display:none;" />
+        </label>
+      </div>
+      ${loading ? '<div class="dash-loading">Loading&hellip;</div>' : ''}
+      ${!loading && pending.length ? `
+        <div class="gi-section-label">Pending pick</div>
+        ${pending.map(o => renderOrderCard(o)).join('')}` : ''}
+      ${!loading && staged.length ? `
+        <div class="gi-section-label">Ready to collect — tap to sign off</div>
+        ${staged.map(o => renderOrderCard(o)).join('')}` : ''}
+      ${!loading && done.length ? `
+        <div class="gi-section-label">Completed</div>
+        ${done.map(o => renderOrderCard(o)).join('')}` : ''}
+      ${!loading && !orders.length ? `<div class="text-muted text-sm" style="text-align:center;padding:24px 0;">No Goods Out orders yet.</div>` : ''}`;
+  }
+
+  function renderC5OutUpload() {
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c5out-back-list">&#8592; Back</button></div>
+      <div class="card">
+        <div class="card-title">Parsing invoice&hellip;</div>
+        <div class="progress-bar" style="margin-top:12px;"><div class="progress-fill" id="go-progress-fill" style="width:0%;"></div></div>
+        <p class="text-muted text-sm" id="go-progress-label" style="margin-top:8px;">Reading PDF&hellip;</p>
+      </div>`;
+  }
+
+  function renderC5OutPreview() {
+    const { po } = state.c5out;
+    if (!po) return renderC5OutList();
+    const lineRows = (po.items || []).map(item => `
+      <div class="gi-line">
+        <div class="gi-line-name">${esc(item.name)}</div>
+        ${item.sku ? `<div class="gi-line-sku">${esc(item.sku)}</div>` : ''}
+        <div class="gi-line-qty">${item.qty}</div>
+      </div>`).join('');
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c5out-back-list">&#8592; Back</button></div>
+      <div class="card">
+        <div class="card-title">Review invoice</div>
+        <div style="margin-bottom:12px;">
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:2px;">Invoice ref</div>
+          <div style="font-weight:600;">${esc(po.poNumber || '')}</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:2px;">Collector</div>
+          <div style="font-weight:600;">${esc(po.supplier || 'Not detected')}</div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;">Collector type</div>
+          <div style="display:flex;gap:8px;">
+            ${['tradesman','competitor','customer'].map(t => `
+              <button class="gi-status-btn ${state.c5out.collectorType === t ? 'active-ok' : ''}"
+                data-action="c5out-set-type" data-type="${t}"
+                style="flex:1;text-transform:capitalize;">${t}</button>`).join('')}
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:4px;">Collection date</div>
+          <input type="date" id="go-date-input" value="${state.c5out.collectionDate || new Date().toISOString().slice(0,10)}"
+            style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:.9rem;"
+            data-action="c5out-date-input" />
+        </div>
+        <div style="margin-bottom:16px;">
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;">Items (${po.items.length})</div>
+          ${lineRows}
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" data-action="c5out-back-list" style="flex:1;">Cancel</button>
+          <button class="btn btn-primary" data-action="c5out-save" style="flex:2;">Push to warehouse</button>
+        </div>
+      </div>`;
+  }
+
+  function renderC5OutStaged() {
+    const o = state.c5out.activeOrder;
+    const lines = state.c5out.activeLines || [];
+    if (!o) return renderC5OutList();
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c5out-back-list">&#8592; Back</button></div>
+      <div class="card">
+        <div class="card-title">Stage order</div>
+        <p class="text-muted text-sm" style="margin-bottom:14px;">Pick and stage all items below, then mark as ready when the order is complete.</p>
+        <div style="margin-bottom:8px;font-size:.78rem;color:var(--muted);">Invoice ${esc(o.invoice_ref)} — ${esc(o.collector_name)}</div>
+        <div style="margin-bottom:16px;">
+          ${lines.map(l => `
+            <div class="gi-line">
+              <div class="gi-line-name">${esc(l.item_name)}</div>
+              ${l.sku ? `<div class="gi-line-sku">${esc(l.sku)}</div>` : ''}
+              <div class="gi-line-qty">Qty: ${l.qty}</div>
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-primary" data-action="c5out-mark-staged" data-id="${esc(o.id)}" style="width:100%;">
+          &#10003; Staged — ready for collection
+        </button>
+      </div>`;
+  }
+
+  function renderC5OutSignoff() {
+    const o = state.c5out.activeOrder;
+    const lines = state.c5out.activeLines || [];
+    if (!o) return renderC5OutList();
+    return `
+      <div class="mod-back"><button class="btn btn-ghost" data-action="c5out-back-list">&#8592; Back</button></div>
+      <div class="card">
+        <div class="card-title">Confirm collection</div>
+        <p class="text-muted text-sm" style="margin-bottom:14px;">Go through the items with the collector. Both parties confirm everything is correct, then the collector signs below.</p>
+        <div style="margin-bottom:8px;font-size:.78rem;color:var(--muted);">Invoice ${esc(o.invoice_ref)} — ${esc(o.collector_name)}</div>
+        <div style="margin-bottom:16px;">
+          ${lines.map((l, idx) => `
+            <div class="gi-line" style="cursor:pointer;" data-action="c5out-toggle-line" data-idx="${idx}">
+              <div style="display:flex;align-items:center;gap:10px;flex:1;">
+                <span style="font-size:1.1rem;color:${(state.c5out.lineChecks || [])[idx] ? '#10b981' : '#cbd5e1'};">
+                  ${(state.c5out.lineChecks || [])[idx] ? '&#10003;' : '&#9675;'}
+                </span>
+                <div>
+                  <div class="gi-line-name" style="margin:0;">${esc(l.item_name)}</div>
+                  ${l.sku ? `<div class="gi-line-sku" style="margin:0;">${esc(l.sku)}</div>` : ''}
+                </div>
+              </div>
+              <div class="gi-line-qty">Qty: ${l.qty}</div>
+            </div>`).join('')}
+        </div>
+        <div style="margin-bottom:12px;">
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:4px;">Collector signature</div>
+          <canvas id="go-sig-canvas" width="400" height="160"
+            style="border:1px solid var(--border);border-radius:8px;width:100%;touch-action:none;background:#fff;display:block;"></canvas>
+          <button class="btn btn-ghost" data-action="c5out-clear-sig" style="margin-top:6px;font-size:.78rem;padding:4px 10px;">Clear</button>
+        </div>
+        <button class="btn btn-primary" data-action="c5out-confirm-collection" data-id="${esc(o.id)}" style="width:100%;">
+          Confirm collection
+        </button>
+      </div>`;
+  }
+
+  function initGOSignaturePad() {
+    const canvas = document.getElementById('go-sig-canvas');
+    if (!canvas || canvas._gobound) return;
+    canvas._gobound = true;
+    const ctx = canvas.getContext('2d');
+    ctx.strokeStyle = '#0f172a'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+    let drawing = false, lastX = 0, lastY = 0;
+    const getPos = ev => {
+      const r = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / r.width;
+      const scaleY = canvas.height / r.height;
+      const src = ev.touches ? ev.touches[0] : ev;
+      return [(src.clientX - r.left) * scaleX, (src.clientY - r.top) * scaleY];
+    };
+    canvas.addEventListener('mousedown', ev => { drawing = true; [lastX, lastY] = getPos(ev); });
+    canvas.addEventListener('mousemove', ev => {
+      if (!drawing) return;
+      const [x, y] = getPos(ev);
+      ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(x, y); ctx.stroke();
+      [lastX, lastY] = [x, y];
+    });
+    canvas.addEventListener('mouseup',   () => { drawing = false; });
+    canvas.addEventListener('touchstart', ev => { ev.preventDefault(); drawing = true; [lastX, lastY] = getPos(ev); }, { passive: false });
+    canvas.addEventListener('touchmove',  ev => {
+      ev.preventDefault();
+      if (!drawing) return;
+      const [x, y] = getPos(ev);
+      ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(x, y); ctx.stroke();
+      [lastX, lastY] = [x, y];
+    }, { passive: false });
+    canvas.addEventListener('touchend', () => { drawing = false; });
+  }
+
+  function bindC5OutEvents(action, btn, e) {
+    if (action === 'c5-tab-in') {
+      state.c5.tab = 'in';
+      state.view = 'c5-list';
+      render(); loadC5POs(); return true;
+    }
+    if (action === 'c5-tab-out') {
+      state.c5.tab = 'out';
+      state.view = 'c5out-list';
+      render(); loadC5OutOrders(); return true;
+    }
+    if (action === 'c5out-back-list') {
+      state.c5.tab = 'out';
+      state.view = 'c5out-list';
+      state.c5out.po = null; state.c5out.activeOrder = null; state.c5out.activeLines = [];
+      state.c5out.uploadError = null; state.c5out.collectorType = null;
+      state.c5out.collectionDate = null; state.c5out.lineChecks = [];
+      render(); loadC5OutOrders(); return true;
+    }
+    if (action === 'c5out-set-type') {
+      state.c5out.collectorType = btn.dataset.type;
+      render(); return true;
+    }
+    if (action === 'c5out-date-input') {
+      state.c5out.collectionDate = btn.value;
+      return true;
+    }
+    if (action === 'c5out-save') {
+      const po = state.c5out.po;
+      if (!po) return true;
+      if (!state.c5out.collectorType) { toast('Select a collector type first'); return true; }
+      const dateVal = document.getElementById('go-date-input');
+      const collDate = dateVal ? dateVal.value : (state.c5out.collectionDate || new Date().toISOString().slice(0,10));
+      (async () => {
+        try {
+          const orderRes = await sb('goods_out_orders', {
+            method: 'POST',
+            body: JSON.stringify({
+              invoice_ref:     po.poNumber,
+              collector_name:  po.supplier,
+              collector_type:  state.c5out.collectorType,
+              collection_date: collDate,
+              status:          'pending',
+            }),
+            prefer: 'return=representation',
+          });
+          const order = Array.isArray(orderRes) ? orderRes[0] : orderRes;
+          if (!order || !order.id) throw new Error('Order insert failed');
+          const lineRows = (po.items || []).map(item => ({
+            order_id:  order.id,
+            item_name: item.name,
+            sku:       item.sku || null,
+            qty:       item.qty,
+            confirmed: false,
+          }));
+          await sb('goods_out_lines', {
+            method: 'POST',
+            body: JSON.stringify(lineRows),
+          });
+          toast('Order pushed to warehouse');
+          state.c5out.po = null;
+          state.c5out.collectorType = null;
+          state.c5out.collectionDate = null;
+          state.view = 'c5out-list';
+          await loadC5OutOrders();
+          await loadC5OutBadgeCount();
+        } catch (err) {
+          console.error('GO save error', err);
+          toast('Save failed — check connection');
+        }
+      })();
+      return true;
+    }
+    if (action === 'c5out-open-stage') {
+      const id = btn.dataset.id;
+      const order = (state.c5out.orders || []).find(o => o.id === id);
+      if (!order) return true;
+      (async () => {
+        const lines = await sb(`goods_out_lines?order_id=eq.${id}&order=id.asc`);
+        state.c5out.activeOrder = order;
+        state.c5out.activeLines = lines || [];
+        state.view = 'c5out-staged';
+        render();
+      })();
+      return true;
+    }
+    if (action === 'c5out-mark-staged') {
+      const id = btn.dataset.id;
+      (async () => {
+        await sb(`goods_out_orders?id=eq.${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'staged' }),
+          prefer: 'return=representation',
+        });
+        toast('Order staged — ready for collection');
+        await loadC5OutOrders();
+        await loadC5OutBadgeCount();
+        state.view = 'c5out-list';
+        render();
+      })();
+      return true;
+    }
+    if (action === 'c5out-open-signoff') {
+      const id = btn.dataset.id;
+      const order = (state.c5out.orders || []).find(o => o.id === id);
+      if (!order) return true;
+      (async () => {
+        const lines = await sb(`goods_out_lines?order_id=eq.${id}&order=id.asc`);
+        state.c5out.activeOrder = order;
+        state.c5out.activeLines = lines || [];
+        state.c5out.lineChecks  = (lines || []).map(() => false);
+        state.view = 'c5out-signoff';
+        render();
+        setTimeout(initGOSignaturePad, 80);
+      })();
+      return true;
+    }
+    if (action === 'c5out-toggle-line') {
+      const idx = Number(btn.dataset.idx);
+      if (!state.c5out.lineChecks) state.c5out.lineChecks = [];
+      state.c5out.lineChecks[idx] = !state.c5out.lineChecks[idx];
+      render();
+      setTimeout(initGOSignaturePad, 80);
+      return true;
+    }
+    if (action === 'c5out-clear-sig') {
+      const canvas = document.getElementById('go-sig-canvas');
+      if (canvas) canvas.getContext('2d').clearRect(0, 0, canvas.width, canvas.height);
+      return true;
+    }
+    if (action === 'c5out-confirm-collection') {
+      const id = btn.dataset.id;
+      const canvas = document.getElementById('go-sig-canvas');
+      const sig = canvas ? canvas.toDataURL('image/png') : null;
+      if (!sig || sig === 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAZAAAACoCAYAAADmRYAZAAAABmJLR0QA/wD/AP+gvaeTAAAAC0lEQVQI12NgAAIABQAABjkB6wAAAABJRU5ErkJggg==') {
+        toast('Please get a signature before confirming'); return true;
+      }
+      (async () => {
+        await sb(`goods_out_orders?id=eq.${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: 'complete', completed_at: new Date().toISOString(), signature_data: sig }),
+          prefer: 'return=representation',
+        });
+        await sb(`goods_out_lines?order_id=eq.${id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ confirmed: true }),
+          prefer: 'return=representation',
+        });
+        toast('Collection confirmed');
+        await loadC5OutOrders();
+        await loadC5OutBadgeCount();
+        state.view = 'c5out-list';
+        state.c5out.activeOrder = null;
+        state.c5out.activeLines = [];
+        state.c5out.lineChecks  = [];
+        render();
+      })();
+      return true;
+    }
+    if (action === 'c5out-delete') {
+      e.stopPropagation();
+      const id  = btn.dataset.id;
+      const ref = btn.dataset.ref;
+      const pin = prompt(`Enter admin PIN to delete ${ref}:`);
+      if (!pin) return true;
+      if (String(pin).trim() !== String(DASH_PIN)) { toast('Incorrect PIN — deletion cancelled'); return true; }
+      (async () => {
+        await sb(`goods_out_lines?order_id=eq.${id}`, { method: 'DELETE' });
+        await sb(`goods_out_orders?id=eq.${id}`, { method: 'DELETE' });
+        toast(`${ref} deleted`);
+        await loadC5OutOrders();
+        await loadC5OutBadgeCount();
+      })();
+      return true;
+    }
+    return false;
+  }
+
+  /* ── File input listener for GO PDF upload ── */
+  function attachGOFileListener() {
+    const inp = document.getElementById('go-file-input');
+    if (!inp || inp._gobound) return;
+    inp._gobound = true;
+    inp.addEventListener('change', async function () {
+      const file = this.files[0];
+      if (!file) return;
+      state.view = 'c5out-upload'; render();
+      try {
+        const text = await extractPdfText(file);
+        const isPO = /PURCHASE\s+ORDER/i.test(text);
+        if (isPO) {
+          state.view = 'c5out-list';
+          state.c5out.uploadError = 'That looks like a purchase order, not an invoice. Please upload the Moon Invoice PDF for this collection.';
+          render(); return;
+        }
+        const parsed = parsePurchaseOrder(text, file.name);
+        if (!parsed.items.length) {
+          state.view = 'c5out-list';
+          state.c5out.uploadError = 'No line items found in that PDF. Please check the file and try again.';
+          render(); return;
+        }
+        state.c5out.uploadError = null;
+        state.c5out.po = parsed;
+        state.c5out.collectorType = null;
+        state.c5out.collectionDate = new Date().toISOString().slice(0,10);
+        state.view = 'c5out-preview';
+        render();
+      } catch (err) {
+        console.error('GO parse error:', err);
+        state.view = 'c5out-list';
+        state.c5out.uploadError = 'Could not read that PDF. Please try again.';
         render();
       }
     });
