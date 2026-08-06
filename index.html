@@ -1,4 +1,4 @@
-<!-- Talli v2.14.0 - deployed 05 Aug 2026 -->
+<!-- Talli v2.14.1 - deployed 06 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.14.0';
+const APP_VERSION = 'v2.14.1';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v2.14.0';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.14.0';
+  const VERSION = 'v2.14.1';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -3811,28 +3811,36 @@ const APP_VERSION = 'v2.14.0';
     const el = document.getElementById('dashboard');
     if (!el) return;
     try {
-      const { data: picks } = await sb.from('pick_completions')
-        .select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200);
+      /* ── All queries run in parallel ── */
+      const STOCK_COLS = 'id,name,sku,current_qty,low_stock_qty,backorder_until,backorder_note,out_of_stock,oos_expected_date,oos_expected_label';
 
-      const { data: delivs } = await sb.from('deliveries')
-        .select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200);
+      const [
+        picksRes, delivsRes, remedialPoRes, shortChecksRes, altsRes, stockRes, giRes,
+      ] = await Promise.allSettled([
+        sb.from('pick_completions').select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200),
+        sb.from('deliveries').select('*').gt('shortfall', 0).order('updated_at', { ascending: false }).limit(200),
+        sb.from('remedials').select('job_ref, po_ref').eq('status', 'ordered').not('po_ref', 'is', null),
+        sb.from('checks').select('*').in('status', ['short', 'part']).order('updated_at', { ascending: false }).limit(300),
+        sb.from('alternatives').select('*').eq('status', 'pending').order('updated_at', { ascending: false }).limit(100),
+        sb.from('stock_items').select(STOCK_COLS),
+        sb.from('goods_in_lines').select('*, goods_in_pos(po_number, supplier, po_date)').or('has_partial.eq.true,has_damage.eq.true').eq('resolved', false).order('created_at', { ascending: false }).limit(100),
+      ]);
 
-      /* load raised PO refs for pending/ordered remedials */
-      const { data: remedialPoData } = await sb.from('remedials')
-        .select('job_ref, po_ref').eq('status', 'ordered').not('po_ref', 'is', null);
+      const picks        = picksRes.status       === 'fulfilled' ? (picksRes.value.data       || []) : [];
+      const delivs       = delivsRes.status      === 'fulfilled' ? (delivsRes.value.data      || []) : [];
+      const remedialPoData = remedialPoRes.status === 'fulfilled' ? (remedialPoRes.value.data  || []) : [];
+      const shortChecks  = shortChecksRes.status  === 'fulfilled' ? (shortChecksRes.value.data || []) : [];
+      const alts         = altsRes.status         === 'fulfilled' ? (altsRes.value.data        || []) : [];
+      const stock        = stockRes.status        === 'fulfilled' ? (stockRes.value.data       || []) : [];
+      const giExceptions = giRes.status           === 'fulfilled' ? (giRes.value.data          || []) : [];
+
+      /* ── Remedial PO refs ── */
       state.dashRemedialPORefs = {};
-      if (remedialPoData) {
-        remedialPoData.forEach(r => {
-          if (r.po_ref) state.dashRemedialPORefs[r.job_ref] = r.po_ref;
-        });
-      }
+      remedialPoData.forEach(r => { if (r.po_ref) state.dashRemedialPORefs[r.job_ref] = r.po_ref; });
 
-      const { data: shortChecks } = await sb.from('checks')
-        .select('*').in('status', ['short', 'part'])
-        .order('updated_at', { ascending: false }).limit(300);
-
+      /* ── M1 purchasing shortfalls — secondary query only if needed ── */
       let m1 = [];
-      if (shortChecks && shortChecks.length) {
+      if (shortChecks.length) {
         const sessIds = [...new Set(shortChecks.map(c => c.session_id))].slice(0, 8);
         const { data: sessions } = await sb.from('sessions')
           .select('id, code, master_list').in('id', sessIds).neq('archived', true);
@@ -3850,48 +3858,31 @@ const APP_VERSION = 'v2.14.0';
       }
 
       const m2Map = new Map();
-      (picks || []).forEach(r => {
+      picks.forEach(r => {
         const job = displayJobRef(r.job_ref) || r.job_ref;
         if (!m2Map.has(job)) m2Map.set(job, []);
         m2Map.get(job).push(r);
       });
 
       const m3Map = new Map();
-      (delivs || []).forEach(r => {
+      delivs.forEach(r => {
         const job = displayJobRef(r.job_ref) || r.job_ref;
         if (!m3Map.has(job)) m3Map.set(job, []);
         m3Map.get(job).push(r);
       });
 
-      /* ── Alternatives pending review ── */
-      const { data: alts } = await sb.from('alternatives')
-        .select('*').eq('status', 'pending').order('updated_at', { ascending: false }).limit(100);
-
       /* ── Stock checker summary ── */
-      const { data: stockRows } = await sb.from('stock_items').select('*');
-      const stock = stockRows || [];
-      const stockCounted = stock.filter(i => i.current_qty !== null && i.current_qty !== undefined).length;
-      const stockLow = stock.filter(i =>
+      const stockCounted   = stock.filter(i => i.current_qty !== null && i.current_qty !== undefined).length;
+      const stockLow       = stock.filter(i =>
         i.current_qty !== null && i.current_qty !== undefined &&
         i.low_stock_qty !== null && i.low_stock_qty !== undefined &&
         Number(i.current_qty) <= Number(i.low_stock_qty));
       const stockBackorder = stock.filter(i => !!i.backorder_until);
 
-      /* ── Goods In exceptions (partials + damaged) ── */
-      let giExceptions = [];
-      try {
-        const { data: giData } = await sb.from('goods_in_lines')
-          .select('*, goods_in_pos(po_number, supplier, po_date)')
-          .or('has_partial.eq.true,has_damage.eq.true')
-          .eq('resolved', false)
-          .order('created_at', { ascending: false }).limit(100);
-        giExceptions = giData || [];
-      } catch (_) { /* table not yet created — silently skip */ }
-
       state.dash = {
-        loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()], alts: alts || [],
+        loading: false, m1, m2: [...m2Map.entries()], m3: [...m3Map.entries()], alts,
         stockTotal: stock.length, stockCounted, stockLow, stockBackorder, stockAll: stock,
-        m5: giExceptions || [],
+        m5: giExceptions,
       };
       el.innerHTML = renderDashboardContent();
     } catch (err) {
