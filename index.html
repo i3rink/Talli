@@ -1,4 +1,4 @@
-<!-- Talli v2.14.1 - deployed 06 Aug 2026 -->
+<!-- Talli v2.14.3 - deployed 06 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.14.1';
+const APP_VERSION = 'v2.14.3';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v2.14.1';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.14.1';
+  const VERSION = 'v2.14.3';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -1727,11 +1727,11 @@ const APP_VERSION = 'v2.14.1';
             ${isBackordered ? `<button class="btn btn-ghost" data-action="c4-bo-clear" data-id="${esc(i.id)}">Clear</button>` : ''}
           </div>` : '';
         return `
-        <div class="c4-item-row${isBackordered ? ' c4-item-row-bo' : ''}${i.out_of_stock ? ' c4-item-row-oos' : ''}">
+        <div class="c4-item-row${isBackordered ? ' c4-item-row-bo' : ''}${i.stocked === 'no' ? ' c4-item-row-oos' : ''}">
           <div class="c4-item-info">
             <div class="c4-item-name">${esc(i.name)}</div>
             ${(i.sku || i.vendor_sku) ? `<span class="item-sku">${esc(i.sku || i.vendor_sku)}</span>` : ''}
-            ${i.out_of_stock ? `<span class="c4-oos-tag">Out of stock${i.oos_expected_label ? ' - ' + esc(i.oos_expected_label) : ''}</span>` : ''}
+            ${i.stocked === 'no' ? `<span class="c4-oos-tag">Out of stock${i.oos_expected_label ? ' - ' + esc(i.oos_expected_label) : ''}</span>` : ''}
             <div class="c4-loc-pills">
               <span class="c4-loc-label">Location</span>
               ${['7','9','11','SHO','19'].map(loc => `<button class="c4-loc-pill${(i.warehouse||'') === loc ? ' active' : ''}" data-action="c4-loc" data-id="${esc(i.id)}" data-loc="${loc}">${loc}</button>`).join('')}
@@ -2277,11 +2277,11 @@ const APP_VERSION = 'v2.14.1';
             ${isBackordered ? `<button class="btn btn-ghost" data-action="c4-bo-clear" data-id="${esc(i.id)}">Clear</button>` : ''}
           </div>` : '';
         return `
-        <div class="c4-item-row${isBackordered ? ' c4-item-row-bo' : ''}${i.out_of_stock ? ' c4-item-row-oos' : ''}">
+        <div class="c4-item-row${isBackordered ? ' c4-item-row-bo' : ''}${i.stocked === 'no' ? ' c4-item-row-oos' : ''}">
           <div class="c4-item-info">
             <div class="c4-item-name">${esc(i.name)}</div>
             ${(i.sku || i.vendor_sku) ? `<span class="item-sku">${esc(i.sku || i.vendor_sku)}</span>` : ''}
-            ${i.out_of_stock ? `<span class="c4-oos-tag">Out of stock${i.oos_expected_label ? ' - ' + esc(i.oos_expected_label) : ''}</span>` : ''}
+            ${i.stocked === 'no' ? `<span class="c4-oos-tag">Out of stock${i.oos_expected_label ? ' - ' + esc(i.oos_expected_label) : ''}</span>` : ''}
             <div class="c4-loc-pills">
               <span class="c4-loc-label">Location</span>
               ${['7','9','11','SHO','19'].map(loc => `<button class="c4-loc-pill${(i.warehouse||'') === loc ? ' active' : ''}" data-action="c4-loc" data-id="${esc(i.id)}" data-loc="${loc}">${loc}</button>`).join('')}
@@ -3812,7 +3812,7 @@ const APP_VERSION = 'v2.14.1';
     if (!el) return;
     try {
       /* ── All queries run in parallel ── */
-      const STOCK_COLS = 'id,name,sku,current_qty,low_stock_qty,backorder_until,backorder_note,out_of_stock,oos_expected_date,oos_expected_label';
+      const STOCK_COLS = 'id,name,sku,current_qty,low_stock_qty,backorder_until,backorder_note,stocked,oos_expected_date,oos_expected_label';
 
       const [
         picksRes, delivsRes, remedialPoRes, shortChecksRes, altsRes, stockRes, giRes,
@@ -3936,7 +3936,7 @@ const APP_VERSION = 'v2.14.1';
       oosMatches = [...skuExact, ...skuStarts, ...skuContains, ...nameMatches].slice(0, 10);
     }
     const oosResultRows = oosMatches.map(i => {
-      const isOos = !!i.out_of_stock;
+      const isOos = i.stocked === 'no';
       const showMarkForm = state.dash.oosMarkFormId === i.id;
       const markForm = showMarkForm ? `
         <div class="stock-oos-mark-form">
@@ -3994,11 +3994,11 @@ const APP_VERSION = 'v2.14.1';
   async function toggleOosItem(id, currentlyOos) {
     /* this path only runs for "mark back in stock" now - going out of stock uses the mark form */
     const { error } = await sb.from('stock_items').update({
-      out_of_stock: false, oos_expected_date: null, oos_expected_label: null,
+      stocked: 'yes', oos_expected_date: null, oos_expected_label: null,
     }).eq('id', id);
     if (error) { toast('Save failed - check connection'); return; }
     const item = (state.dash.stockAll || []).find(i => i.id === id);
-    if (item) { item.out_of_stock = false; item.oos_expected_date = null; item.oos_expected_label = null; }
+    if (item) { item.stocked = 'yes'; item.oos_expected_date = null; item.oos_expected_label = null; }
     toast('Marked back in stock');
     const dashEl = document.getElementById('dashboard');
     if (dashEl) dashEl.innerHTML = renderDashboardContent();
@@ -4034,11 +4034,11 @@ const APP_VERSION = 'v2.14.1';
     else if (choice === 'never') { label = 'Never \u2014 end of line'; }
     else if (choice === 'custom') { label = (customEl ? customEl.value.trim() : '') || 'Date to be confirmed'; }
     const { error } = await sb.from('stock_items').update({
-      out_of_stock: true, oos_expected_date: dateVal, oos_expected_label: label,
+      stocked: 'no', oos_expected_date: dateVal, oos_expected_label: label,
     }).eq('id', id);
     if (error) { toast('Save failed - check connection'); return; }
     const item = (state.dash.stockAll || []).find(i => i.id === id);
-    if (item) { item.out_of_stock = true; item.oos_expected_date = dateVal; item.oos_expected_label = label; }
+    if (item) { item.stocked = 'no'; item.oos_expected_date = dateVal; item.oos_expected_label = label; }
     state.dash.oosMarkFormId = null;
     toast('Marked out of stock');
     const dashEl = document.getElementById('dashboard');
@@ -5517,8 +5517,10 @@ const APP_VERSION = 'v2.14.1';
 
   async function loadC5OutBadgeCount() {
     try {
-      const data = await sb(`goods_out_orders?status=in.(pending,staged)&select=id`, {});
-      state.c5out.badgeCount = (data || []).length;
+      const { data, error } = await sb.from('goods_out_orders')
+        .select('id', { count: 'exact', head: false })
+        .in('status', ['pending', 'staged']);
+      state.c5out.badgeCount = error ? 0 : (data || []).length;
     } catch (e) {
       state.c5out.badgeCount = 0;
     }
@@ -5528,8 +5530,9 @@ const APP_VERSION = 'v2.14.1';
   async function loadC5OutOrders() {
     state.c5out.loading = true; render();
     try {
-      const data = await sb(`goods_out_orders?order=created_at.desc&select=*`);
-      state.c5out.orders = data || [];
+      const { data, error } = await sb.from('goods_out_orders')
+        .select('*').order('created_at', { ascending: false });
+      state.c5out.orders = error ? [] : (data || []);
     } catch (e) {
       state.c5out.orders = [];
     }
@@ -5798,30 +5801,24 @@ const APP_VERSION = 'v2.14.1';
       const collDate = dateVal ? dateVal.value : (state.c5out.collectionDate || new Date().toISOString().slice(0,10));
       (async () => {
         try {
-          const orderRes = await sb('goods_out_orders', {
-            method: 'POST',
-            body: JSON.stringify({
+          const { data: orderData, error: orderErr } = await sb.from('goods_out_orders')
+            .insert({
               invoice_ref:     po.poNumber,
               collector_name:  po.supplier,
               collector_type:  state.c5out.collectorType,
               collection_date: collDate,
               status:          'pending',
-            }),
-            prefer: 'return=representation',
-          });
-          const order = Array.isArray(orderRes) ? orderRes[0] : orderRes;
-          if (!order || !order.id) throw new Error('Order insert failed');
+            }).select().single();
+          if (orderErr || !orderData || !orderData.id) throw new Error('Order insert failed');
           const lineRows = (po.items || []).map(item => ({
-            order_id:  order.id,
+            order_id:  orderData.id,
             item_name: item.name,
             sku:       item.sku || null,
             qty:       item.qty,
             confirmed: false,
           }));
-          await sb('goods_out_lines', {
-            method: 'POST',
-            body: JSON.stringify(lineRows),
-          });
+          const { error: linesErr } = await sb.from('goods_out_lines').insert(lineRows);
+          if (linesErr) throw new Error('Lines insert failed');
           toast('Order pushed to warehouse');
           state.c5out.po = null;
           state.c5out.collectorType = null;
@@ -5841,7 +5838,8 @@ const APP_VERSION = 'v2.14.1';
       const order = (state.c5out.orders || []).find(o => o.id === id);
       if (!order) return true;
       (async () => {
-        const lines = await sb(`goods_out_lines?order_id=eq.${id}&order=id.asc`);
+        const { data: lines } = await sb.from('goods_out_lines')
+          .select('*').eq('order_id', id).order('id', { ascending: true });
         state.c5out.activeOrder = order;
         state.c5out.activeLines = lines || [];
         state.view = 'c5out-staged';
@@ -5852,11 +5850,7 @@ const APP_VERSION = 'v2.14.1';
     if (action === 'c5out-mark-staged') {
       const id = btn.dataset.id;
       (async () => {
-        await sb(`goods_out_orders?id=eq.${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: 'staged' }),
-          prefer: 'return=representation',
-        });
+        await sb.from('goods_out_orders').update({ status: 'staged' }).eq('id', id);
         toast('Order staged — ready for collection');
         await loadC5OutOrders();
         await loadC5OutBadgeCount();
@@ -5870,7 +5864,8 @@ const APP_VERSION = 'v2.14.1';
       const order = (state.c5out.orders || []).find(o => o.id === id);
       if (!order) return true;
       (async () => {
-        const lines = await sb(`goods_out_lines?order_id=eq.${id}&order=id.asc`);
+        const { data: lines } = await sb.from('goods_out_lines')
+          .select('*').eq('order_id', id).order('id', { ascending: true });
         state.c5out.activeOrder = order;
         state.c5out.activeLines = lines || [];
         state.c5out.lineChecks  = (lines || []).map(() => false);
@@ -5901,16 +5896,10 @@ const APP_VERSION = 'v2.14.1';
         toast('Please get a signature before confirming'); return true;
       }
       (async () => {
-        await sb(`goods_out_orders?id=eq.${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ status: 'complete', completed_at: new Date().toISOString(), signature_data: sig }),
-          prefer: 'return=representation',
-        });
-        await sb(`goods_out_lines?order_id=eq.${id}`, {
-          method: 'PATCH',
-          body: JSON.stringify({ confirmed: true }),
-          prefer: 'return=representation',
-        });
+        await sb.from('goods_out_orders').update({
+          status: 'complete', completed_at: new Date().toISOString(), signature_data: sig,
+        }).eq('id', id);
+        await sb.from('goods_out_lines').update({ confirmed: true }).eq('order_id', id);
         toast('Collection confirmed');
         await loadC5OutOrders();
         await loadC5OutBadgeCount();
@@ -5930,8 +5919,8 @@ const APP_VERSION = 'v2.14.1';
       if (!pin) return true;
       if (String(pin).trim() !== String(DASH_PIN)) { toast('Incorrect PIN — deletion cancelled'); return true; }
       (async () => {
-        await sb(`goods_out_lines?order_id=eq.${id}`, { method: 'DELETE' });
-        await sb(`goods_out_orders?id=eq.${id}`, { method: 'DELETE' });
+        await sb.from('goods_out_lines').delete().eq('order_id', id);
+        await sb.from('goods_out_orders').delete().eq('id', id);
         toast(`${ref} deleted`);
         await loadC5OutOrders();
         await loadC5OutBadgeCount();
