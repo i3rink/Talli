@@ -1,4 +1,4 @@
-<!-- Talli v2.14.3 - deployed 06 Aug 2026 -->
+<!-- Talli v2.14.4 - deployed 06 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.14.3';
+const APP_VERSION = 'v2.14.4';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v2.14.3';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.14.3';
+  const VERSION = 'v2.14.4';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -5520,11 +5520,12 @@ const APP_VERSION = 'v2.14.3';
       const { data, error } = await sb.from('goods_out_orders')
         .select('id', { count: 'exact', head: false })
         .in('status', ['pending', 'staged']);
+      const prev = state.c5out.badgeCount;
       state.c5out.badgeCount = error ? 0 : (data || []).length;
+      if (state.c5out.badgeCount !== prev) render();
     } catch (e) {
-      state.c5out.badgeCount = 0;
+      /* silent — do not render on failure */
     }
-    render();
   }
 
   async function loadC5OutOrders() {
