@@ -1,4 +1,4 @@
-<!-- Talli v2.14.4 - deployed 06 Aug 2026 -->
+<!-- Talli v2.15.0 - deployed 06 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.14.4';
+const APP_VERSION = 'v2.15.0';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v2.14.4';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.14.4';
+  const VERSION = 'v2.15.0';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick Verifier · ' + VERSION,
@@ -675,7 +675,7 @@ const APP_VERSION = 'v2.14.4';
     c4: { screen: 'overview', subCat: null },
     /* module 5 - goods in */
     c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null, isRemedialPO: false, remedialMatchError: null, tab: 'in' },
-    c5out: { orders: [], loading: false, badgeCount: 0, activeOrder: null, activeLines: [], uploadError: null, po: null },
+    c5out: { orders: [], loading: false, badgeCount: 0, activeOrder: null, activeLines: [], uploadError: null, po: null, pickChecks: [] },
     adhocRemedial: { open: false, jobRef: '', itemName: '', qty: '', reason: 'damaged_delivery', submitting: false },
     c6: { items: [], loading: false, badgeCount: 0 },
     /* home dashboard */
@@ -5556,7 +5556,11 @@ const APP_VERSION = 'v2.14.4';
 
     const renderOrderCard = (o) => {
       const isActionable = o.status === 'pending' || o.status === 'staged';
-      const statusLabel = { pending: 'Pending pick', staged: 'Ready to collect', complete: 'Collected' }[o.status] || o.status;
+      const isDeliveryOrder = (o.fulfilment_type || 'collection') === 'delivery';
+      const statusLabel = o.status === 'pending' ? 'Pending pick'
+        : o.status === 'staged' ? (isDeliveryOrder ? 'Ready for delivery' : 'Ready to collect')
+        : o.status === 'complete' ? (isDeliveryOrder ? 'Delivered' : 'Collected')
+        : o.status;
       const statusStyle = { pending: 'background:#fef3c7;color:#92400e;', staged: 'background:#dcfce7;color:#166534;', complete: 'background:#f1f5f9;color:#475569;' }[o.status] || '';
       const date = o.collection_date ? new Date(o.collection_date + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) : '';
       return `
@@ -5608,7 +5612,7 @@ const APP_VERSION = 'v2.14.4';
         <div class="gi-section-label">Pending pick</div>
         ${pending.map(o => renderOrderCard(o)).join('')}` : ''}
       ${!loading && staged.length ? `
-        <div class="gi-section-label">Ready to collect — tap to sign off</div>
+        <div class="gi-section-label">Ready — tap to sign off</div>
         ${staged.map(o => renderOrderCard(o)).join('')}` : ''}
       ${!loading && done.length ? `
         <div class="gi-section-label">Completed</div>
@@ -5657,6 +5661,15 @@ const APP_VERSION = 'v2.14.4';
           </div>
         </div>
         <div style="margin-bottom:12px;">
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:6px;">Fulfilment</div>
+          <div style="display:flex;gap:8px;">
+            ${['collection','delivery'].map(ft => `
+              <button class="gi-status-btn ${(state.c5out.fulfilmentType || 'collection') === ft ? 'active-ok' : ''}"
+                data-action="c5out-set-fulfilment" data-ft="${ft}"
+                style="flex:1;text-transform:capitalize;">${ft === 'collection' ? '&#127968; Collection' : '&#128666; Delivery'}</button>`).join('')}
+          </div>
+        </div>
+        <div style="margin-bottom:12px;">
           <div style="font-size:.78rem;color:var(--muted);margin-bottom:4px;">Collection date</div>
           <input type="date" id="go-date-input" value="${state.c5out.collectionDate || new Date().toISOString().slice(0,10)}"
             style="width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:.9rem;"
@@ -5677,23 +5690,37 @@ const APP_VERSION = 'v2.14.4';
     const o = state.c5out.activeOrder;
     const lines = state.c5out.activeLines || [];
     if (!o) return renderC5OutList();
+    const picks = state.c5out.pickChecks || [];
+    const allPicked = lines.length > 0 && lines.every((_, i) => picks[i]);
+    const pickedCount = picks.filter(Boolean).length;
+    const isDelivery = (o.fulfilment_type || 'collection') === 'delivery';
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="c5out-back-list">&#8592; Back</button></div>
       <div class="card">
-        <div class="card-title">Stage order</div>
-        <p class="text-muted text-sm" style="margin-bottom:14px;">Pick and stage all items below, then mark as ready when the order is complete.</p>
+        <div class="card-title">Pick order</div>
+        <p class="text-muted text-sm" style="margin-bottom:14px;">Tick each item as you pick it. All items must be confirmed before you can mark the order as ready.</p>
         <div style="margin-bottom:8px;font-size:.78rem;color:var(--muted);">Invoice ${esc(o.invoice_ref)} — ${esc(o.collector_name)}</div>
+        <div style="margin-bottom:4px;font-size:.78rem;color:var(--muted);">${pickedCount} of ${lines.length} picked</div>
         <div style="margin-bottom:16px;">
-          ${lines.map(l => `
-            <div class="gi-line">
-              <div class="gi-line-name">${esc(l.item_name)}</div>
-              ${l.sku ? `<div class="gi-line-sku">${esc(l.sku)}</div>` : ''}
+          ${lines.map((l, idx) => `
+            <div class="gi-line" style="cursor:pointer;" data-action="c5out-toggle-pick" data-idx="${idx}">
+              <div style="display:flex;align-items:center;gap:10px;flex:1;">
+                <span style="font-size:1.1rem;color:${picks[idx] ? '#10b981' : '#cbd5e1'};">
+                  ${picks[idx] ? '&#10003;' : '&#9675;'}
+                </span>
+                <div>
+                  <div class="gi-line-name" style="margin:0;">${esc(l.item_name)}</div>
+                  ${l.sku ? `<div class="gi-line-sku" style="margin:0;">${esc(l.sku)}</div>` : ''}
+                </div>
+              </div>
               <div class="gi-line-qty">Qty: ${l.qty}</div>
             </div>`).join('')}
         </div>
-        <button class="btn btn-primary" data-action="c5out-mark-staged" data-id="${esc(o.id)}" style="width:100%;">
-          &#10003; Staged — ready for collection
+        <button class="btn btn-primary" data-action="c5out-mark-staged" data-id="${esc(o.id)}"
+          style="width:100%;${allPicked ? '' : 'opacity:.45;pointer-events:none;'}">
+          &#10003; ${isDelivery ? 'Ready for delivery' : 'Ready for collection'}
         </button>
+        ${!allPicked ? `<p class="text-muted text-sm" style="text-align:center;margin-top:8px;">Tick all items to enable</p>` : ''}
       </div>`;
   }
 
@@ -5704,8 +5731,8 @@ const APP_VERSION = 'v2.14.4';
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="c5out-back-list">&#8592; Back</button></div>
       <div class="card">
-        <div class="card-title">Confirm collection</div>
-        <p class="text-muted text-sm" style="margin-bottom:14px;">Go through the items with the collector. Both parties confirm everything is correct, then the collector signs below.</p>
+        <div class="card-title">${(o.fulfilment_type || 'collection') === 'delivery' ? 'Confirm delivery' : 'Confirm collection'}</div>
+        <p class="text-muted text-sm" style="margin-bottom:14px;">${(o.fulfilment_type || 'collection') === 'delivery' ? 'Go through the items with the recipient. Both parties confirm everything arrived correctly, then the recipient signs below.' : 'Go through the items with the collector. Both parties confirm everything is correct, then the collector signs below.'}</p>
         <div style="margin-bottom:8px;font-size:.78rem;color:var(--muted);">Invoice ${esc(o.invoice_ref)} — ${esc(o.collector_name)}</div>
         <div style="margin-bottom:16px;">
           ${lines.map((l, idx) => `
@@ -5729,7 +5756,7 @@ const APP_VERSION = 'v2.14.4';
           <button class="btn btn-ghost" data-action="c5out-clear-sig" style="margin-top:6px;font-size:.78rem;padding:4px 10px;">Clear</button>
         </div>
         <button class="btn btn-primary" data-action="c5out-confirm-collection" data-id="${esc(o.id)}" style="width:100%;">
-          Confirm collection
+          ${(o.fulfilment_type || 'collection') === 'delivery' ? 'Confirm delivery received' : 'Confirm collection'}
         </button>
       </div>`;
   }
@@ -5783,11 +5810,22 @@ const APP_VERSION = 'v2.14.4';
       state.view = 'c5out-list';
       state.c5out.po = null; state.c5out.activeOrder = null; state.c5out.activeLines = [];
       state.c5out.uploadError = null; state.c5out.collectorType = null;
-      state.c5out.collectionDate = null; state.c5out.lineChecks = [];
+      state.c5out.collectionDate = null; state.c5out.lineChecks = []; state.c5out.pickChecks = [];
+      state.c5out.fulfilmentType = null;
       render(); loadC5OutOrders(); return true;
     }
     if (action === 'c5out-set-type') {
       state.c5out.collectorType = btn.dataset.type;
+      render(); return true;
+    }
+    if (action === 'c5out-set-fulfilment') {
+      state.c5out.fulfilmentType = btn.dataset.ft;
+      render(); return true;
+    }
+    if (action === 'c5out-toggle-pick') {
+      const idx = Number(btn.dataset.idx);
+      if (!state.c5out.pickChecks) state.c5out.pickChecks = [];
+      state.c5out.pickChecks[idx] = !state.c5out.pickChecks[idx];
       render(); return true;
     }
     if (action === 'c5out-date-input') {
@@ -5804,11 +5842,12 @@ const APP_VERSION = 'v2.14.4';
         try {
           const { data: orderData, error: orderErr } = await sb.from('goods_out_orders')
             .insert({
-              invoice_ref:     po.poNumber,
-              collector_name:  po.supplier,
-              collector_type:  state.c5out.collectorType,
-              collection_date: collDate,
-              status:          'pending',
+              invoice_ref:      po.poNumber,
+              collector_name:   po.supplier,
+              collector_type:   state.c5out.collectorType,
+              fulfilment_type:  state.c5out.fulfilmentType || 'collection',
+              collection_date:  collDate,
+              status:           'pending',
             }).select().single();
           if (orderErr || !orderData || !orderData.id) throw new Error('Order insert failed');
           const lineRows = (po.items || []).map(item => ({
@@ -5823,6 +5862,7 @@ const APP_VERSION = 'v2.14.4';
           toast('Order pushed to warehouse');
           state.c5out.po = null;
           state.c5out.collectorType = null;
+          state.c5out.fulfilmentType = null;
           state.c5out.collectionDate = null;
           state.view = 'c5out-list';
           await loadC5OutOrders();
@@ -5843,6 +5883,7 @@ const APP_VERSION = 'v2.14.4';
           .select('*').eq('order_id', id).order('id', { ascending: true });
         state.c5out.activeOrder = order;
         state.c5out.activeLines = lines || [];
+        state.c5out.pickChecks = (lines || []).map(() => false);
         state.view = 'c5out-staged';
         render();
       })();
@@ -5851,8 +5892,9 @@ const APP_VERSION = 'v2.14.4';
     if (action === 'c5out-mark-staged') {
       const id = btn.dataset.id;
       (async () => {
-        await sb.from('goods_out_orders').update({ status: 'staged' }).eq('id', id);
-        toast('Order staged — ready for collection');
+        const isDelivery = (state.c5out.activeOrder?.fulfilment_type || 'collection') === 'delivery';
+        await sb.from('goods_out_orders').update({ status: 'staged', picked_at: new Date().toISOString() }).eq('id', id);
+        toast(isDelivery ? 'Order ready for delivery' : 'Order staged — ready for collection');
         await loadC5OutOrders();
         await loadC5OutBadgeCount();
         state.view = 'c5out-list';
