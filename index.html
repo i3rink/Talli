@@ -1,4 +1,4 @@
-<!-- Talli v2.15.0 - deployed 06 Aug 2026 -->
+<!-- Talli v3.0.3 - deployed 11 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v2.15.0';
+const APP_VERSION = 'v3.0.3';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,15 +618,15 @@ const APP_VERSION = 'v2.15.0';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v2.15.0';
+  const VERSION = 'v3.0.3';
   const MODULE_LABELS = {
     home: VERSION,
-    verifier: 'Pick Verifier · ' + VERSION,
-    completion: 'Pick Completion · ' + VERSION,
-    delivery: 'Driver Delivery · ' + VERSION,
-    stock: 'Stock Checker · ' + VERSION,
+    verifier: 'Pick &amp; Pack · ' + VERSION,
+    completion: 'Pick &amp; Pack · ' + VERSION,
+    delivery: 'Delivery Sign-off · ' + VERSION,
+    stock: 'Stock · ' + VERSION,
     goodsin: 'Goods In · ' + VERSION,
-    remedial: 'Remedial Deliveries · ' + VERSION,
+    remedial: 'Remedials · ' + VERSION,
   };
 
   function applyTheme(mod) {
@@ -792,49 +792,42 @@ const APP_VERSION = 'v2.15.0';
       <div class="lp-grid">
         <button class="lp-card c-blue" data-action="open-module" data-mod="verifier">
           <span class="lp-num">01</span>
-          <span class="lp-name">Pick Verifier</span>
-          <span class="lp-desc">Parse packing slips, build the pick list, check stock.</span>
-          <span class="lp-glyph" style="color:#0075ab;">${ic.list}</span>
+          <span class="lp-name">Goods In</span>
+          <span class="lp-desc">Receive stock against purchase orders.</span>
+          <span class="lp-glyph" style="color:#0075ab;">${ic.inbox}</span>
         </button>
         <button class="lp-card c-green" data-action="open-module" data-mod="completion">
           <span class="lp-num">02</span>
-          <span class="lp-name">Pick Completion</span>
-          <span class="lp-desc">Mark jobs as picked, flag shortfalls to purchasing.</span>
+          <span class="lp-name">Pick &amp; Pack</span>
+          <span class="lp-desc">Pick, pack and sign off any outbound order.</span>
           <span class="lp-glyph" style="color:#059669;">${ic.check}</span>
         </button>
         <button class="lp-card c-orange" data-action="open-module" data-mod="delivery">
           <span class="lp-num">03</span>
-          <span class="lp-name">Driver Delivery</span>
-          <span class="lp-desc">Enter a job, tick off what landed on site.</span>
+          <span class="lp-name">Driver Hub</span>
+          <span class="lp-desc">All van jobs — deliveries, collections and remedial runs.</span>
           <span class="lp-glyph" style="color:#ea580c;">${ic.truck}</span>
         </button>
         <button class="lp-card c-purple" data-action="open-module" data-mod="stock">
           <span class="lp-num">04</span>
-          <span class="lp-name">Stock Checker</span>
-          <span class="lp-desc">Physical counts by category, variance review, audit trail.</span>
-          <span class="lp-glyph" style="color:#7c3aed;">${ic.pkg}</span>
+          <span class="lp-name">Remedials</span>
+          <span class="lp-desc">Fitter-raised jobs from pick through to delivery.</span>
+          <span class="lp-glyph" style="color:#7c3aed;">${ic.wrench}</span>
         </button>
         <button class="lp-card c-teal" data-action="open-module" data-mod="goodsin" style="position:relative;">
           <span class="lp-num">05</span>
-          <span class="lp-name">Goods In / Out</span>
-          <span class="lp-desc">Receive stock in and manage counter collections out.</span>
-          <span class="lp-glyph" style="color:#0d9488;">${ic.inbox}</span>
+          <span class="lp-name">Stock Checker</span>
+          <span class="lp-desc">Counts, levels and audit trail.</span>
+          <span class="lp-glyph" style="color:#0d9488;">${ic.pkg}</span>
           ${(state.c5out.badgeCount > 0) ? `<span class="lp-badge-count">${state.c5out.badgeCount}</span>` : ''}
         </button>
         <button class="lp-card c-slate" data-action="open-module" data-mod="remedial">
           <span class="lp-num">06</span>
-          <span class="lp-name">Remedials</span>
-          <span class="lp-desc">Outstanding remedial deliveries ready to pick and pack.</span>
-          <span class="lp-glyph" style="color:#475569;">${ic.wrench}</span>
+          <span class="lp-name">Admin</span>
+          <span class="lp-desc">Dashboard and management tools.</span>
+          <span class="lp-glyph" style="color:#475569;">${ic.list}</span>
           ${state.c6.badgeCount > 0 ? `<span class="lp-badge-count">${state.c6.badgeCount}</span>` : ''}
         </button>
-      </div>
-      <div class="dash-wrap">
-        <div class="dash-heading">
-          <span class="dash-heading-title">Pending actions</span>
-          ${state.dashUnlocked ? `<button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>` : ''}
-        </div>
-        <div id="dashboard">${state.dashUnlocked ? '<div class="dash-loading">Loading&#8230;</div>' : renderDashLock()}</div>
       </div>`;
   }
 
