@@ -1,4 +1,4 @@
-<!-- Talli v3.0.7 - deployed 11 Aug 2026 -->
+<!-- Talli v3.0.8 - deployed 11 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.0.7';
+const APP_VERSION = 'v3.0.8';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v3.0.7';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.0.7';
+  const VERSION = 'v3.0.8';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -909,6 +909,18 @@ const APP_VERSION = 'v3.0.7';
     return `
       <div class="mod-back"><button class="btn btn-ghost" data-action="upload-cancel">&#8592; Back</button></div>
       ${dupHtml}
+      <div class="card" style="background:#f0fdf4;border-color:#bbf7d0;margin-bottom:4px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+          <div>
+            <div class="card-title" style="color:#166534;margin-bottom:2px;">Pick Completion</div>
+            <div class="text-muted text-sm" style="color:#15803d;">Search a job number and mark items as picked.</div>
+          </div>
+          <button class="btn" data-action="open-module" data-mod="completion"
+            style="background:#16a34a;border-color:#16a34a;color:#fff;white-space:nowrap;flex-shrink:0;">
+            Go &#8594;
+          </button>
+        </div>
+      </div>
       <div class="card">
         <div class="card-title">New Stock Check Session</div>
         ${stagedHtml}
