@@ -1,4 +1,4 @@
-<!-- Talli v3.0.3 - deployed 11 Aug 2026 -->
+<!-- Talli v3.0.4 - deployed 11 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.0.3';
+const APP_VERSION = 'v3.0.4';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v3.0.3';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.0.3';
+  const VERSION = 'v3.0.4';
   const MODULE_LABELS = {
     home: VERSION,
     verifier: 'Pick &amp; Pack · ' + VERSION,
@@ -746,6 +746,7 @@ const APP_VERSION = 'v3.0.3';
     else if (v === 'c5-list')      root.innerHTML = renderC5List();
     else if (v === 'c5out-list')    root.innerHTML = renderC5OutList();
     else if (v === 'c5out-upload')  root.innerHTML = renderC5OutUpload();
+    else if (v === 'admin-home')   root.innerHTML = renderAdminHome();
     else if (v === 'c5out-preview') root.innerHTML = renderC5OutPreview();
     else if (v === 'c5out-staged')  root.innerHTML = renderC5OutStaged();
     else if (v === 'c5out-signoff') root.innerHTML = renderC5OutSignoff();
@@ -790,13 +791,13 @@ const APP_VERSION = 'v3.0.3';
         <div class="text-muted text-sm">Pick a module to get started.</div>
       </div>
       <div class="lp-grid">
-        <button class="lp-card c-blue" data-action="open-module" data-mod="verifier">
+        <button class="lp-card c-blue" data-action="open-module" data-mod="goodsin">
           <span class="lp-num">01</span>
           <span class="lp-name">Goods In</span>
           <span class="lp-desc">Receive stock against purchase orders.</span>
           <span class="lp-glyph" style="color:#0075ab;">${ic.inbox}</span>
         </button>
-        <button class="lp-card c-green" data-action="open-module" data-mod="completion">
+        <button class="lp-card c-green" data-action="open-module" data-mod="verifier">
           <span class="lp-num">02</span>
           <span class="lp-name">Pick &amp; Pack</span>
           <span class="lp-desc">Pick, pack and sign off any outbound order.</span>
@@ -808,25 +809,25 @@ const APP_VERSION = 'v3.0.3';
           <span class="lp-desc">All van jobs — deliveries, collections and remedial runs.</span>
           <span class="lp-glyph" style="color:#ea580c;">${ic.truck}</span>
         </button>
-        <button class="lp-card c-purple" data-action="open-module" data-mod="stock">
+        <button class="lp-card c-purple" data-action="open-module" data-mod="remedial">
           <span class="lp-num">04</span>
           <span class="lp-name">Remedials</span>
           <span class="lp-desc">Fitter-raised jobs from pick through to delivery.</span>
           <span class="lp-glyph" style="color:#7c3aed;">${ic.wrench}</span>
+          ${state.c6.badgeCount > 0 ? `<span class="lp-badge-count">${state.c6.badgeCount}</span>` : ''}
         </button>
-        <button class="lp-card c-teal" data-action="open-module" data-mod="goodsin" style="position:relative;">
+        <button class="lp-card c-teal" data-action="open-module" data-mod="stock" style="position:relative;">
           <span class="lp-num">05</span>
           <span class="lp-name">Stock Checker</span>
           <span class="lp-desc">Counts, levels and audit trail.</span>
           <span class="lp-glyph" style="color:#0d9488;">${ic.pkg}</span>
-          ${(state.c5out.badgeCount > 0) ? `<span class="lp-badge-count">${state.c5out.badgeCount}</span>` : ''}
         </button>
-        <button class="lp-card c-slate" data-action="open-module" data-mod="remedial">
+        <button class="lp-card c-slate" data-action="open-module" data-mod="admin">
           <span class="lp-num">06</span>
           <span class="lp-name">Admin</span>
           <span class="lp-desc">Dashboard and management tools.</span>
           <span class="lp-glyph" style="color:#475569;">${ic.list}</span>
-          ${state.c6.badgeCount > 0 ? `<span class="lp-badge-count">${state.c6.badgeCount}</span>` : ''}
+          ${(state.c5out.badgeCount > 0) ? `<span class="lp-badge-count">${state.c5out.badgeCount}</span>` : ''}
         </button>
       </div>`;
   }
@@ -2430,6 +2431,7 @@ const APP_VERSION = 'v3.0.3';
       if (mod === 'completion') { state.view = 'c2-home'; }
       if (mod === 'delivery')   { state.view = 'c3-home'; }
       if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadWallPanels(), loadC4EOLItems()]).then(render); }
+      if (mod === 'admin')      { state.view = 'admin-home'; render(); return; }
       if (mod === 'remedial')   { state.module = 'remedial'; state.view = 'c6-list'; applyTheme('remedial'); loadC6Remedials().then(render); render(); return; }
       if (mod === 'goodsin')    {
         state.module = 'goodsin';
@@ -3763,6 +3765,22 @@ const APP_VERSION = 'v3.0.3';
      HOME DASHBOARD
   ═══════════════════════════════════════════════ */
   const DASH_PIN = '1690';
+
+  function renderAdminHome() {
+    if (state.dashUnlocked) setTimeout(loadDashboard, 0);
+    return `
+      <div class="mod-header">
+        <button class="btn btn-ghost" data-action="nav-home">&#8592; Home</button>
+        <span class="mod-title">Admin</span>
+      </div>
+      <div class="dash-wrap">
+        <div class="dash-heading">
+          <span class="dash-heading-title">Pending actions</span>
+          ${state.dashUnlocked ? `<button class="btn btn-ghost" data-action="dash-refresh" style="padding:6px 12px;font-size:.78rem;">&#8635; Refresh</button>` : ''}
+        </div>
+        <div id="dashboard">${state.dashUnlocked ? '<div class="dash-loading">Loading&#8230;</div>' : renderDashLock()}</div>
+      </div>`;
+  }
 
   function renderDashLock() {
     return `
