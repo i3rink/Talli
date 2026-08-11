@@ -1,4 +1,4 @@
-<!-- Talli v3.0.5 - deployed 11 Aug 2026 -->
+<!-- Talli v3.0.6 - deployed 11 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.0.5';
+const APP_VERSION = 'v3.0.6';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,15 +618,16 @@ const APP_VERSION = 'v3.0.5';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.0.5';
+  const VERSION = 'v3.0.6';
   const MODULE_LABELS = {
-    home: VERSION,
-    verifier: 'Pick &amp; Pack · ' + VERSION,
+    home:       VERSION,
+    verifier:   'Pick &amp; Pack · ' + VERSION,
     completion: 'Pick &amp; Pack · ' + VERSION,
-    delivery: 'Delivery Sign-off · ' + VERSION,
-    stock: 'Stock · ' + VERSION,
-    goodsin: 'Goods In · ' + VERSION,
-    remedial: 'Remedials · ' + VERSION,
+    delivery:   'Driver Hub · ' + VERSION,
+    stock:      'Stock Checker · ' + VERSION,
+    goodsin:    'Goods In · ' + VERSION,
+    remedial:   'Remedials · ' + VERSION,
+    admin:      'Admin · ' + VERSION,
   };
 
   function applyTheme(mod) {
@@ -2431,7 +2432,7 @@ const APP_VERSION = 'v3.0.5';
       if (mod === 'completion') { state.view = 'c2-home'; }
       if (mod === 'delivery')   { state.view = 'c3-home'; }
       if (mod === 'stock')      { state.view = 'c4-overview'; Promise.all([loadC4Counts(), loadMiscItems(), loadShowroomBays(), loadWallPanels(), loadC4EOLItems()]).then(render); }
-      if (mod === 'admin')      { state.view = 'admin-home'; render(); return; }
+      if (mod === 'admin')      { state.module = 'admin'; applyTheme('home'); state.view = 'admin-home'; render(); return; }
       if (mod === 'remedial')   { state.module = 'remedial'; state.view = 'c6-list'; applyTheme('remedial'); loadC6Remedials().then(render); render(); return; }
       if (mod === 'goodsin')    {
         state.module = 'goodsin';
