@@ -1,4 +1,4 @@
-<!-- Talli v3.0.6 - deployed 11 Aug 2026 -->
+<!-- Talli v3.0.7 - deployed 11 Aug 2026 -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -589,7 +589,7 @@
 
 <script>
 'use strict';
-const APP_VERSION = 'v3.0.6';
+const APP_VERSION = 'v3.0.7';
 (function () {
 
   /* ═══════════════════════════════════════════════
@@ -618,7 +618,7 @@ const APP_VERSION = 'v3.0.6';
     goodsin:    { main: '#0d9488', dark: '#0f766e', light: '#ccfbf1', faint: '#f0fdfa' },
     remedial:   { main: '#dc2626', dark: '#b91c1c', light: '#fee2e2', faint: '#fef2f2' },
   };
-  const VERSION = 'v3.0.6';
+  const VERSION = 'v3.0.7';
   const MODULE_LABELS = {
     home:       VERSION,
     verifier:   'Pick &amp; Pack · ' + VERSION,
@@ -675,7 +675,7 @@ const APP_VERSION = 'v3.0.6';
     /* module 4 - stock checker */
     c4: { screen: 'overview', subCat: null },
     /* module 5 - goods in */
-    c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null, isRemedialPO: false, remedialMatchError: null, tab: 'in' },
+    c5: { screen: 'list', po: null, lines: [], receipts: {}, receiverName: '', arrivalType: 'delivery', loading: false, stagedFile: null, uploadError: null, isRemedialPO: false, remedialMatchError: null, tab: 'in', completedExpanded: false },
     c5out: { orders: [], loading: false, badgeCount: 0, activeOrder: null, activeLines: [], uploadError: null, po: null, pickChecks: [] },
     adhocRemedial: { open: false, jobRef: '', itemName: '', qty: '', reason: 'damaged_delivery', submitting: false },
     c6: { items: [], loading: false, badgeCount: 0 },
@@ -5047,7 +5047,7 @@ const APP_VERSION = 'v3.0.6';
     const { data: poRow, error: poErr } = await sb.from('goods_in_pos').upsert({
       po_number:       po.poNumber,
       supplier:        po.supplier,
-      po_date:         po.poDate || null,
+      po_date:         po.poDate ? (() => { const d = new Date(po.poDate); return isNaN(d) ? null : d.toISOString().split('T')[0]; })() : null,
       status:          'pending',
       is_remedial:     state.c5.isRemedialPO || false,
       remedial_po_ref: state.c5.isRemedialPO ? normPoNum : null,
@@ -5159,7 +5159,7 @@ const APP_VERSION = 'v3.0.6';
             <div class="gi-po-num">PO ${esc(p.po_number)}</div>
             <div class="gi-po-meta">
               <div class="gi-po-supplier">${esc(p.supplier || 'Unknown supplier')}</div>
-              <div class="gi-po-date">${p.po_date ? new Date(p.po_date + 'T00:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }) : 'Date not recorded'}</div>
+              <div class="gi-po-date">${p.po_date ? (() => { const d = new Date(p.po_date); return isNaN(d) ? p.po_date : d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }); })() : 'Date not recorded'}</div>
             </div>
           </div>
           ${isPending
@@ -5200,8 +5200,14 @@ const APP_VERSION = 'v3.0.6';
         <div class="gi-section-label">On order — tap to receive</div>
         ${pendingPos.map(p => renderPoCard(p)).join('')}` : ''}
       ${!loading && completePos.length ? `
-        <div class="gi-section-label">Completed</div>
-        ${completePos.map(p => renderPoCard(p)).join('')}` : ''}
+        <div class="gi-section-label" style="display:flex;align-items:center;justify-content:space-between;">
+          <span>Completed (${completePos.length})</span>
+          <button class="btn btn-ghost" data-action="gi-toggle-completed"
+            style="padding:3px 10px;font-size:.78rem;">
+            ${state.c5.completedExpanded ? '&#9650; Hide' : '&#9660; Show'}
+          </button>
+        </div>
+        ${state.c5.completedExpanded ? completePos.map(p => renderPoCard(p)).join('') : ''}` : ''}
       ${!loading && !pos.length ? `<div class="text-muted text-sm" style="text-align:center;padding:24px 0;">No POs recorded yet.</div>` : ''}`;
   }
 
@@ -5402,6 +5408,10 @@ const APP_VERSION = 'v3.0.6';
 
   /* ── Goods In action handlers ── */
   function bindC5Events(action, btn, e) {
+    if (action === 'gi-toggle-completed') {
+      state.c5.completedExpanded = !state.c5.completedExpanded;
+      render(); return;
+    }
     if (action === 'gi-file-pick') return;
 
     if (action === 'gi-remedial-po-toggle') {
